@@ -83,13 +83,18 @@ type etherfuseTransactionResponse struct {
 func mapStatusToSEP24(transfer *stellarconnect.Transfer) string {
 	status := string(transfer.Status)
 
-	// Etherfuse withdrawal: once withdraw details are available, present as
-	// pending_user_transfer_start so the wallet knows to prompt the user.
-	if transfer.Kind == stellarconnect.KindWithdrawal && status == "pending_external" {
-		if transfer.Metadata != nil {
-			if _, ok := transfer.Metadata["etherfuse_withdraw_anchor_account"]; ok {
-				return "pending_user_transfer_start"
+	if transfer.Kind == stellarconnect.KindWithdrawal {
+		switch status {
+		case "pending_external":
+			// Withdraw details available: wallet should prompt the user to send payment.
+			if transfer.Metadata != nil {
+				if _, ok := transfer.Metadata["etherfuse_withdraw_anchor_account"]; ok {
+					return "pending_user_transfer_start"
+				}
 			}
+		case "pending_stellar":
+			// Stellar payment confirmed; now waiting for Etherfuse to disburse MXN.
+			return "pending_external"
 		}
 	}
 
@@ -134,7 +139,10 @@ func buildTransactionResponse(transfer *stellarconnect.Transfer, baseURL string)
 		}
 		if wm, ok := transfer.Metadata["etherfuse_withdraw_memo"].(string); ok {
 			resp.WithdrawMemo = wm
-			resp.WithdrawMemoType = "text"
+			resp.WithdrawMemoType = "text" // default
+		}
+		if wmt, ok := transfer.Metadata["etherfuse_withdraw_memo_type"].(string); ok {
+			resp.WithdrawMemoType = wmt
 		}
 		if fee, ok := transfer.Metadata["etherfuse_fee_amount"].(string); ok {
 			resp.AmountFee = fee
@@ -413,10 +421,33 @@ func handleMoreInfo(store stellarconnect.TransferStore) http.HandlerFunc {
 
 		status := mapStatusToSEP24(transfer)
 
+		orderID := ""
+		if transfer.Metadata != nil {
+			if oid, ok := transfer.Metadata["etherfuse_order_id"].(string); ok {
+				orderID = oid
+			}
+		}
+
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "<html><body><h1>Transaction %s</h1><p>Status: %s</p><p>Kind: %s</p></body></html>",
-			transfer.ID, status, string(transfer.Kind))
+		fmt.Fprintf(w, `<html><head><style>
+body{font-family:system-ui,sans-serif;max-width:520px;margin:40px auto;padding:0 16px;background:#f5f5f5;color:#1a1a1a}
+.card{background:#fff;border-radius:12px;padding:28px;box-shadow:0 2px 12px rgba(0,0,0,0.08)}
+h1{font-size:20px;margin-bottom:16px}
+.row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f3f4f6;font-size:14px}
+.row:last-child{border-bottom:none}
+.label{color:#6b7280}
+.value{font-weight:600;word-break:break-all;max-width:60%%;text-align:right}
+.copy-btn{display:block;margin-top:16px;padding:10px;background:#f3f4f6;border:none;border-radius:6px;cursor:pointer;font-size:13px;width:100%%}
+</style></head><body><div class="card">
+<h1>Transaction Details</h1>
+<div class="row"><span class="label">Transaction ID</span><span class="value">%s</span></div>
+<div class="row"><span class="label">Kind</span><span class="value">%s</span></div>
+<div class="row"><span class="label">Status</span><span class="value">%s</span></div>
+<div class="row"><span class="label">Etherfuse Order ID</span><span class="value">%s</span></div>
+<button class="copy-btn" onclick="navigator.clipboard.writeText('%s').then(()=>this.textContent='Copied!')">Copy Order ID</button>
+</div></body></html>`,
+			transfer.ID, string(transfer.Kind), status, orderID, orderID)
 	}
 }
 

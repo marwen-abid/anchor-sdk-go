@@ -176,6 +176,9 @@ func main() {
 	}()
 	log.Printf("Observer started watching %s", distributionAccount)
 
+	// Start order poller (handles lifecycle when webhooks can't reach localhost)
+	startOrderPoller(etherfuseClient, transferManager, transferStore, cfg.NetworkPassphrase)
+
 	// HTTP routes
 	mux := http.NewServeMux()
 

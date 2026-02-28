@@ -299,13 +299,21 @@
 {{else if eq .Step "withdrawal-pending"}}
     <h1>Withdrawal Initiated</h1>
     <p class="subtitle">Your withdrawal order has been created.</p>
-    <div class="alert alert-success">
-        Your withdrawal order is being processed. Your wallet will prompt you to send a Stellar payment to complete the process.
+    <div class="alert alert-success">Order created successfully!</div>
+    <div class="detail-row">
+        <span class="detail-label">Etherfuse Order ID</span>
+        <span class="detail-value" style="font-size:12px; word-break:break-all;">{{.OrderID}}</span>
     </div>
-    <div class="alert alert-info" style="margin-top:12px;">
-        Once the Stellar payment is confirmed, the MXN will be sent to your registered bank account via SPEI.
+    <div class="detail-row">
+        <span class="detail-label">Asset</span>
+        <span class="detail-value">{{.AssetCode}}</span>
     </div>
-    <button class="btn btn-primary" style="margin-top:16px;" onclick="if(window.opener){window.close()}else{window.location.href='/'}">Done</button>
+    <div class="alert alert-info" style="margin-top:16px;">
+        Your wallet will prompt you to send a Stellar payment to the address provided by Etherfuse. Once confirmed, the MXN will be sent to your bank via SPEI.
+    </div>
+    <div class="btn-group" style="margin-top:16px;">
+        <button class="btn btn-secondary" onclick="navigator.clipboard.writeText('{{.OrderID}}').then(()=>this.textContent='Copied!')">Copy Order ID</button>
+    </div>
 
 {{else if eq .Step "kyc-rejected"}}
     <h1>Verification Failed</h1>

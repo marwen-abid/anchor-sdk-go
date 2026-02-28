@@ -194,6 +194,30 @@ func (c *EtherfuseClient) GetAssets(ctx context.Context, wallet string) ([]Ether
 	return resp.Assets, nil
 }
 
+// --- Order Details ---
+
+// OrderDetails from GET /ramp/order/{orderId}.
+type OrderDetails struct {
+	OrderID              string      `json:"orderId"`
+	CustomerID           string      `json:"customerId"`
+	OrderType            string      `json:"orderType"` // "onramp" or "offramp"
+	Status               string      `json:"status"`    // "created", "funded", "completed", "failed", "refunded", "canceled"
+	BurnTransaction      string      `json:"burnTransaction,omitempty"`
+	ConfirmedTxSignature string      `json:"confirmedTxSignature,omitempty"`
+	AmountInFiat         json.Number `json:"amountInFiat,omitempty"`
+	AmountInTokens       json.Number `json:"amountInTokens,omitempty"`
+}
+
+// GetOrder fetches the current state of an order by ID.
+func (c *EtherfuseClient) GetOrder(ctx context.Context, orderID string) (*OrderDetails, error) {
+	path := fmt.Sprintf("/ramp/order/%s", orderID)
+	var resp OrderDetails
+	if err := c.get(ctx, path, &resp); err != nil {
+		return nil, fmt.Errorf("get order: %w", err)
+	}
+	return &resp, nil
+}
+
 // --- HTTP helpers ---
 
 func (c *EtherfuseClient) post(ctx context.Context, path string, body any, result any) error {

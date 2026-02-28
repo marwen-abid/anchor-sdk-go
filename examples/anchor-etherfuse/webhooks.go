@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	stellarconnect "github.com/marwen-abid/anchor-sdk-go"
 	"github.com/marwen-abid/anchor-sdk-go/anchor"
@@ -127,76 +129,185 @@ func handleOrderUpdated(ctx context.Context, tm *anchor.TransferManager, store s
 		return
 	}
 
-	switch payload.Status {
+	applyOrderFields(ctx, tm, store, transfer, networkPassphrase,
+		payload.OrderID, payload.OrderType, payload.Status,
+		payload.BurnTransaction, payload.ConfirmedTxSignature, payload.AmountInTokens)
+}
+
+// applyOrderFields drives transfer state transitions based on Etherfuse order data.
+// It is called by both the webhook handler and the order poller.
+func applyOrderFields(
+	ctx context.Context,
+	tm *anchor.TransferManager,
+	store stellarconnect.TransferStore,
+	transfer *stellarconnect.Transfer,
+	networkPassphrase, orderID, orderType, status, burnTransaction, confirmedTxSignature string,
+	amountInTokens float64,
+) {
+	// Re-read from store for the latest status — the passed-in transfer may be
+	// stale (e.g. fetched from a list scan before another goroutine advanced it).
+	if latest, err := store.FindByID(ctx, transfer.ID); err == nil {
+		transfer = latest
+	}
+
+	currentStatus := string(transfer.Status)
+
+	switch status {
 	case "created":
-		// For offramp orders, decode the burnTransaction to extract withdraw details
-		if payload.OrderType == "offramp" && payload.BurnTransaction != "" {
-			account, memo, err := decodeBurnTransaction(payload.BurnTransaction, networkPassphrase)
+		// For offramp orders, decode the burnTransaction to extract withdraw details.
+		if orderType == "offramp" && burnTransaction != "" {
+			// Idempotency: skip if already applied.
+			if transfer.Metadata != nil {
+				if _, ok := transfer.Metadata["etherfuse_withdraw_anchor_account"]; ok {
+					return
+				}
+			}
+			account, memo, memoType, err := decodeBurnTransaction(burnTransaction, networkPassphrase)
 			if err != nil {
-				log.Printf("Webhook: failed to decode burnTransaction: %v", err)
+				log.Printf("Order %s: failed to decode burnTransaction: %v", orderID, err)
 				return
 			}
-			log.Printf("Webhook: decoded burnTransaction: account=%s memo=%s", account, memo)
+			log.Printf("Order %s: withdraw details: account=%s memoType=%s", orderID, account, memoType)
 			if err := mergeMetadata(ctx, store, transfer.ID, map[string]any{
 				"etherfuse_withdraw_anchor_account": account,
 				"etherfuse_withdraw_memo":           memo,
-				"etherfuse_burn_transaction":        payload.BurnTransaction,
+				"etherfuse_withdraw_memo_type":      memoType,
+				"etherfuse_burn_transaction":        burnTransaction,
 			}); err != nil {
-				log.Printf("Webhook: failed to update withdraw details: %v", err)
+				log.Printf("Order %s: failed to update withdraw details: %v", orderID, err)
 			}
 		}
 
 	case "funded":
-		if payload.OrderType == "onramp" {
-			// Deposit: fiat received, anchor processing
+		if terminalStatuses[currentStatus] {
+			return
+		}
+		var err error
+		if orderType == "onramp" {
+			// Idempotency: NotifyFundsReceived targets pending_external.
+			if currentStatus == "pending_external" || currentStatus == "pending_stellar" {
+				return
+			}
+			// Deposit: fiat received, anchor processing.
 			err = tm.NotifyFundsReceived(ctx, transfer.ID, anchor.FundsReceivedDetails{
-				ExternalRef: payload.OrderID,
-				Amount:      fmt.Sprintf("%.7f", payload.AmountInTokens),
+				ExternalRef: orderID,
+				Amount:      fmt.Sprintf("%.7f", amountInTokens),
 			})
 		} else {
-			// Withdrawal: user's Stellar payment received by Etherfuse
+			// Idempotency: NotifyPaymentReceived targets pending_stellar.
+			if currentStatus == "pending_stellar" {
+				return
+			}
+			// Withdrawal: user's Stellar payment received by Etherfuse.
 			err = tm.NotifyPaymentReceived(ctx, transfer.ID, anchor.PaymentReceivedDetails{
-				StellarTxHash: payload.ConfirmedTxSignature,
-				Amount:        fmt.Sprintf("%.7f", payload.AmountInTokens),
+				StellarTxHash: confirmedTxSignature,
+				Amount:        fmt.Sprintf("%.7f", amountInTokens),
 			})
 		}
 		if err != nil {
-			log.Printf("Webhook: failed to notify funds received for %s: %v", transfer.ID, err)
+			log.Printf("Order %s: failed to notify funds received for %s: %v", orderID, transfer.ID, err)
 		}
 
 	case "completed":
-		if payload.OrderType == "onramp" {
-			// Deposit: Etherfuse sent crypto to user's Stellar account
+		if terminalStatuses[currentStatus] {
+			return
+		}
+		var err error
+		if orderType == "onramp" {
+			// Deposit: Etherfuse sent crypto to user's Stellar account.
 			err = tm.NotifyPaymentSent(ctx, transfer.ID, anchor.PaymentSentDetails{
-				StellarTxHash: payload.ConfirmedTxSignature,
+				StellarTxHash: confirmedTxSignature,
 			})
 		} else {
-			// Withdrawal: Etherfuse sent MXN to user's bank
+			// Withdrawal: Etherfuse sent MXN to user's bank.
 			err = tm.NotifyDisbursementSent(ctx, transfer.ID, anchor.DisbursementDetails{
-				ExternalRef: payload.OrderID,
+				ExternalRef: orderID,
 			})
 		}
 		if err != nil {
-			log.Printf("Webhook: failed to notify completion for %s: %v", transfer.ID, err)
+			log.Printf("Order %s: failed to notify completion for %s: %v", orderID, transfer.ID, err)
 		}
 
 	case "failed":
+		if terminalStatuses[currentStatus] {
+			return
+		}
 		if err := tm.Cancel(ctx, transfer.ID, "Etherfuse order failed"); err != nil {
-			log.Printf("Webhook: failed to cancel transfer %s: %v", transfer.ID, err)
+			log.Printf("Order %s: failed to cancel transfer %s: %v", orderID, transfer.ID, err)
 		}
 
 	case "refunded":
+		if terminalStatuses[currentStatus] {
+			return
+		}
 		if err := tm.Cancel(ctx, transfer.ID, "Etherfuse order refunded"); err != nil {
-			log.Printf("Webhook: failed to cancel (refund) transfer %s: %v", transfer.ID, err)
+			log.Printf("Order %s: failed to cancel (refund) transfer %s: %v", orderID, transfer.ID, err)
 		}
 
 	case "canceled":
+		if terminalStatuses[currentStatus] {
+			return
+		}
 		if err := tm.Cancel(ctx, transfer.ID, "Etherfuse order canceled"); err != nil {
-			log.Printf("Webhook: failed to cancel transfer %s: %v", transfer.ID, err)
+			log.Printf("Order %s: failed to cancel transfer %s: %v", orderID, transfer.ID, err)
 		}
 
 	default:
-		log.Printf("Webhook: unknown order status: %s", payload.Status)
+		log.Printf("Order %s: unknown order status: %s", orderID, status)
+	}
+}
+
+// terminalStatuses are transfer statuses that require no further polling.
+var terminalStatuses = map[string]bool{
+	"completed": true,
+	"failed":    true,
+	"denied":    true,
+	"cancelled": true,
+	"expired":   true,
+}
+
+// startOrderPoller starts a background goroutine that polls Etherfuse every
+// 10 seconds for the current state of all non-terminal transfers. This handles
+// the full order lifecycle when webhooks cannot reach localhost.
+func startOrderPoller(ef *EtherfuseClient, tm *anchor.TransferManager, store stellarconnect.TransferStore, networkPassphrase string) {
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			pollOrders(context.Background(), ef, tm, store, networkPassphrase)
+		}
+	}()
+	log.Printf("Order poller started (interval: 10s)")
+}
+
+// pollOrders iterates all non-terminal transfers with an etherfuse_order_id,
+// fetches the latest order state from Etherfuse, and applies any transitions.
+func pollOrders(ctx context.Context, ef *EtherfuseClient, tm *anchor.TransferManager, store stellarconnect.TransferStore, networkPassphrase string) {
+	transfers, err := store.List(ctx, stellarconnect.TransferFilters{})
+	if err != nil {
+		log.Printf("Poller: failed to list transfers: %v", err)
+		return
+	}
+	for _, t := range transfers {
+		if terminalStatuses[string(t.Status)] {
+			continue
+		}
+		if t.Metadata == nil {
+			continue
+		}
+		orderID, ok := t.Metadata["etherfuse_order_id"].(string)
+		if !ok || orderID == "" {
+			continue
+		}
+		order, err := ef.GetOrder(ctx, orderID)
+		if err != nil {
+			log.Printf("Poller: failed to get order %s: %v", orderID, err)
+			continue
+		}
+		amountInTokens, _ := order.AmountInTokens.Float64()
+		applyOrderFields(ctx, tm, store, t, networkPassphrase,
+			order.OrderID, order.OrderType, order.Status,
+			order.BurnTransaction, order.ConfirmedTxSignature, amountInTokens)
 	}
 }
 
@@ -267,34 +378,37 @@ func findTransferByOrderID(ctx context.Context, store stellarconnect.TransferSto
 }
 
 // decodeBurnTransaction parses a base64-encoded Stellar transaction XDR
-// and extracts the destination account and memo from the payment operation.
-// This is used to populate withdraw_anchor_account and withdraw_memo for
-// SEP-24 withdrawal compliance (design doc section 6.6, Option A).
-func decodeBurnTransaction(xdrBase64 string, networkPassphrase string) (account string, memo string, err error) {
+// and extracts the destination account, memo, and memo type from the payment operation.
+// This is used to populate withdraw_anchor_account, withdraw_memo, and withdraw_memo_type
+// for SEP-24 withdrawal compliance (design doc section 6.6, Option A).
+func decodeBurnTransaction(xdrBase64 string, networkPassphrase string) (account string, memo string, memoType string, err error) {
 	parsed, err := txnbuild.TransactionFromXDR(xdrBase64)
 	if err != nil {
-		return "", "", fmt.Errorf("parse XDR: %w", err)
+		return "", "", "", fmt.Errorf("parse XDR: %w", err)
 	}
 
 	var tx *txnbuild.Transaction
 	if t, ok := parsed.Transaction(); ok {
 		tx = t
 	} else {
-		return "", "", fmt.Errorf("expected Transaction, got FeeBumpTransaction")
+		return "", "", "", fmt.Errorf("expected Transaction, got FeeBumpTransaction")
 	}
 
-	// Extract memo
+	// Extract memo and memo type
 	if tx.Memo() != nil {
 		memoXDR, err := tx.Memo().ToXDR()
 		if err == nil {
 			switch memoXDR.Type {
 			case xdr.MemoTypeMemoText:
 				memo = string(memoXDR.MustText())
+				memoType = "text"
 			case xdr.MemoTypeMemoId:
 				memo = fmt.Sprintf("%d", memoXDR.MustId())
+				memoType = "id"
 			case xdr.MemoTypeMemoHash:
 				hash := memoXDR.MustHash()
-				memo = hex.EncodeToString(hash[:])
+				memo = base64.StdEncoding.EncodeToString(hash[:])
+				memoType = "hash"
 			}
 		}
 	}
@@ -302,11 +416,11 @@ func decodeBurnTransaction(xdrBase64 string, networkPassphrase string) (account 
 	// Find the first payment operation and extract the destination
 	for _, op := range tx.Operations() {
 		if paymentOp, ok := op.(*txnbuild.Payment); ok {
-			return paymentOp.Destination, memo, nil
+			return paymentOp.Destination, memo, memoType, nil
 		}
 	}
 
-	return "", "", fmt.Errorf("no payment operation found in burnTransaction")
+	return "", "", "", fmt.Errorf("no payment operation found in burnTransaction")
 }
 
 // mergeMetadata reads the current transfer metadata and merges new keys into it.

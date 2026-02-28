@@ -416,6 +416,7 @@ func handlePostOrder(
 			}
 
 			data.Step = "withdrawal-pending"
+			data.OrderID = result.OrderID
 		}
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
