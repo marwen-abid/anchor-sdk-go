@@ -106,6 +106,7 @@ type OrderRequest struct {
 	BankAccountID string `json:"bankAccountId"`
 	PublicKey     string `json:"publicKey"`
 	QuoteID       string `json:"quoteId"`
+	UseAnchor     bool   `json:"useAnchor,omitempty"`
 }
 
 // OnrampOrderResult from a deposit order.
@@ -117,7 +118,10 @@ type OnrampOrderResult struct {
 
 // OfframpOrderResult from a withdrawal order.
 type OfframpOrderResult struct {
-	OrderID string `json:"orderId"`
+	OrderID               string `json:"orderId"`
+	WithdrawAnchorAccount string `json:"withdrawAnchorAccount,omitempty"`
+	WithdrawMemo          string `json:"withdrawMemo,omitempty"`
+	WithdrawMemoType      string `json:"withdrawMemoType,omitempty"`
 }
 
 // orderResponse wraps the discriminated union response from POST /ramp/order.
@@ -140,7 +144,9 @@ func (c *EtherfuseClient) CreateOnrampOrder(ctx context.Context, req OrderReques
 }
 
 // CreateOfframpOrder creates a withdrawal order (crypto → MXN).
+// UseAnchor is set to true to receive withdraw anchor details directly in the response.
 func (c *EtherfuseClient) CreateOfframpOrder(ctx context.Context, req OrderRequest) (*OfframpOrderResult, error) {
+	req.UseAnchor = true
 	var resp orderResponse
 	if err := c.post(ctx, "/ramp/order", req, &resp); err != nil {
 		return nil, fmt.Errorf("create offramp order: %w", err)
@@ -198,14 +204,17 @@ func (c *EtherfuseClient) GetAssets(ctx context.Context, wallet string) ([]Ether
 
 // OrderDetails from GET /ramp/order/{orderId}.
 type OrderDetails struct {
-	OrderID              string      `json:"orderId"`
-	CustomerID           string      `json:"customerId"`
-	OrderType            string      `json:"orderType"` // "onramp" or "offramp"
-	Status               string      `json:"status"`    // "created", "funded", "completed", "failed", "refunded", "canceled"
-	BurnTransaction      string      `json:"burnTransaction,omitempty"`
-	ConfirmedTxSignature string      `json:"confirmedTxSignature,omitempty"`
-	AmountInFiat         json.Number `json:"amountInFiat,omitempty"`
-	AmountInTokens       json.Number `json:"amountInTokens,omitempty"`
+	OrderID               string      `json:"orderId"`
+	CustomerID            string      `json:"customerId"`
+	OrderType             string      `json:"orderType"` // "onramp" or "offramp"
+	Status                string      `json:"status"`    // "created", "funded", "completed", "failed", "refunded", "canceled"
+	BurnTransaction       string      `json:"burnTransaction,omitempty"`
+	ConfirmedTxSignature  string      `json:"confirmedTxSignature,omitempty"`
+	AmountInFiat          json.Number `json:"amountInFiat,omitempty"`
+	AmountInTokens        json.Number `json:"amountInTokens,omitempty"`
+	WithdrawAnchorAccount string      `json:"withdrawAnchorAccount,omitempty"`
+	WithdrawMemo          string      `json:"withdrawMemo,omitempty"`
+	WithdrawMemoType      string      `json:"withdrawMemoType,omitempty"`
 }
 
 // GetOrder fetches the current state of an order by ID.

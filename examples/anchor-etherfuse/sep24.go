@@ -83,18 +83,13 @@ type etherfuseTransactionResponse struct {
 func mapStatusToSEP24(transfer *stellarconnect.Transfer) string {
 	status := string(transfer.Status)
 
-	if transfer.Kind == stellarconnect.KindWithdrawal {
-		switch status {
-		case "pending_external":
-			// Withdraw details available: wallet should prompt the user to send payment.
-			if transfer.Metadata != nil {
-				if _, ok := transfer.Metadata["etherfuse_withdraw_anchor_account"]; ok {
-					return "pending_user_transfer_start"
-				}
+	// Etherfuse withdrawal: once withdraw details are available, present as
+	// pending_user_transfer_start so the wallet knows to prompt the user.
+	if transfer.Kind == stellarconnect.KindWithdrawal && status == "pending_external" {
+		if transfer.Metadata != nil {
+			if _, ok := transfer.Metadata["etherfuse_withdraw_anchor_account"]; ok {
+				return "pending_user_transfer_start"
 			}
-		case "pending_stellar":
-			// Stellar payment confirmed; now waiting for Etherfuse to disburse MXN.
-			return "pending_external"
 		}
 	}
 

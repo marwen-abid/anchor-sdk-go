@@ -24,16 +24,19 @@ import (
 
 // OrderUpdatedPayload is the payload for order_updated webhook events.
 type OrderUpdatedPayload struct {
-	OrderID              string  `json:"orderId"`
-	CustomerID           string  `json:"customerId"`
-	OrderType            string  `json:"orderType"` // "onramp" or "offramp"
-	Status               string  `json:"status"`    // "created", "funded", "completed", "failed", "refunded", "canceled"
-	BurnTransaction      string  `json:"burnTransaction,omitempty"`
-	ConfirmedTxSignature string  `json:"confirmedTxSignature,omitempty"`
-	DepositClabe         string  `json:"depositClabe,omitempty"`
-	AmountInFiat         float64 `json:"amountInFiat,omitempty"`
-	AmountInTokens       float64 `json:"amountInTokens,omitempty"`
-	StatusPage           string  `json:"statusPage,omitempty"`
+	OrderID               string  `json:"orderId"`
+	CustomerID            string  `json:"customerId"`
+	OrderType             string  `json:"orderType"` // "onramp" or "offramp"
+	Status                string  `json:"status"`    // "created", "funded", "completed", "failed", "refunded", "canceled"
+	BurnTransaction       string  `json:"burnTransaction,omitempty"`
+	ConfirmedTxSignature  string  `json:"confirmedTxSignature,omitempty"`
+	DepositClabe          string  `json:"depositClabe,omitempty"`
+	AmountInFiat          float64 `json:"amountInFiat,omitempty"`
+	AmountInTokens        float64 `json:"amountInTokens,omitempty"`
+	StatusPage            string  `json:"statusPage,omitempty"`
+	WithdrawAnchorAccount string  `json:"withdrawAnchorAccount,omitempty"`
+	WithdrawMemo          string  `json:"withdrawMemo,omitempty"`
+	WithdrawMemoType      string  `json:"withdrawMemoType,omitempty"`
 }
 
 // KYCUpdatedPayload is the payload for kyc_updated webhook events.
@@ -131,7 +134,8 @@ func handleOrderUpdated(ctx context.Context, tm *anchor.TransferManager, store s
 
 	applyOrderFields(ctx, tm, store, transfer, networkPassphrase,
 		payload.OrderID, payload.OrderType, payload.Status,
-		payload.BurnTransaction, payload.ConfirmedTxSignature, payload.AmountInTokens)
+		payload.BurnTransaction, payload.ConfirmedTxSignature, payload.AmountInTokens,
+		payload.WithdrawAnchorAccount, payload.WithdrawMemo, payload.WithdrawMemoType)
 }
 
 // applyOrderFields drives transfer state transitions based on Etherfuse order data.
@@ -143,6 +147,7 @@ func applyOrderFields(
 	transfer *stellarconnect.Transfer,
 	networkPassphrase, orderID, orderType, status, burnTransaction, confirmedTxSignature string,
 	amountInTokens float64,
+	withdrawAnchorAccount, withdrawMemo, withdrawMemoType string,
 ) {
 	// Re-read from store for the latest status — the passed-in transfer may be
 	// stale (e.g. fetched from a list scan before another goroutine advanced it).
@@ -154,27 +159,40 @@ func applyOrderFields(
 
 	switch status {
 	case "created":
-		// For offramp orders, decode the burnTransaction to extract withdraw details.
-		if orderType == "offramp" && burnTransaction != "" {
+		// For offramp orders, populate withdraw anchor details.
+		if orderType == "offramp" {
 			// Idempotency: skip if already applied.
 			if transfer.Metadata != nil {
 				if _, ok := transfer.Metadata["etherfuse_withdraw_anchor_account"]; ok {
 					return
 				}
 			}
-			account, memo, memoType, err := decodeBurnTransaction(burnTransaction, networkPassphrase)
-			if err != nil {
-				log.Printf("Order %s: failed to decode burnTransaction: %v", orderID, err)
-				return
-			}
-			log.Printf("Order %s: withdraw details: account=%s memoType=%s", orderID, account, memoType)
-			if err := mergeMetadata(ctx, store, transfer.ID, map[string]any{
-				"etherfuse_withdraw_anchor_account": account,
-				"etherfuse_withdraw_memo":           memo,
-				"etherfuse_withdraw_memo_type":      memoType,
-				"etherfuse_burn_transaction":        burnTransaction,
-			}); err != nil {
-				log.Printf("Order %s: failed to update withdraw details: %v", orderID, err)
+			if withdrawAnchorAccount != "" {
+				// Anchor mode: details provided directly — no XDR decoding needed.
+				log.Printf("Order %s: withdraw details (anchor mode): account=%s memoType=%s", orderID, withdrawAnchorAccount, withdrawMemoType)
+				if err := mergeMetadata(ctx, store, transfer.ID, map[string]any{
+					"etherfuse_withdraw_anchor_account": withdrawAnchorAccount,
+					"etherfuse_withdraw_memo":           withdrawMemo,
+					"etherfuse_withdraw_memo_type":      withdrawMemoType,
+				}); err != nil {
+					log.Printf("Order %s: failed to update withdraw details: %v", orderID, err)
+				}
+			} else if burnTransaction != "" {
+				// Legacy path: decode burnTransaction XDR to extract withdraw details.
+				account, memo, memoType, err := decodeBurnTransaction(burnTransaction, networkPassphrase)
+				if err != nil {
+					log.Printf("Order %s: failed to decode burnTransaction: %v", orderID, err)
+					return
+				}
+				log.Printf("Order %s: withdraw details (xdr): account=%s memoType=%s", orderID, account, memoType)
+				if err := mergeMetadata(ctx, store, transfer.ID, map[string]any{
+					"etherfuse_withdraw_anchor_account": account,
+					"etherfuse_withdraw_memo":           memo,
+					"etherfuse_withdraw_memo_type":      memoType,
+					"etherfuse_burn_transaction":        burnTransaction,
+				}); err != nil {
+					log.Printf("Order %s: failed to update withdraw details: %v", orderID, err)
+				}
 			}
 		}
 
@@ -307,7 +325,8 @@ func pollOrders(ctx context.Context, ef *EtherfuseClient, tm *anchor.TransferMan
 		amountInTokens, _ := order.AmountInTokens.Float64()
 		applyOrderFields(ctx, tm, store, t, networkPassphrase,
 			order.OrderID, order.OrderType, order.Status,
-			order.BurnTransaction, order.ConfirmedTxSignature, amountInTokens)
+			order.BurnTransaction, order.ConfirmedTxSignature, amountInTokens,
+			order.WithdrawAnchorAccount, order.WithdrawMemo, order.WithdrawMemoType)
 	}
 }
 

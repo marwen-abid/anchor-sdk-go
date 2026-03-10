@@ -403,9 +403,13 @@ func handlePostOrder(
 			}
 
 			// Store order details in metadata
-			if err := mergeMetadata(ctx, store, transfer.ID, map[string]any{
-				"etherfuse_order_id": result.OrderID,
-			}); err != nil {
+			meta := map[string]any{"etherfuse_order_id": result.OrderID}
+			if result.WithdrawAnchorAccount != "" {
+				meta["etherfuse_withdraw_anchor_account"] = result.WithdrawAnchorAccount
+				meta["etherfuse_withdraw_memo"] = result.WithdrawMemo
+				meta["etherfuse_withdraw_memo_type"] = result.WithdrawMemoType
+			}
+			if err := mergeMetadata(ctx, store, transfer.ID, meta); err != nil {
 				log.Printf("Failed to store order metadata: %v", err)
 			}
 
