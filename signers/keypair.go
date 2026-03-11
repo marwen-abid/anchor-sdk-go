@@ -17,7 +17,7 @@ type keypairSigner struct {
 // FromSecret creates a Signer from a Stellar secret key (S...).
 // Intended for server-side use (exchanges, backends, bots).
 // Returns an error if the secret key is invalid.
-func FromSecret(secret string) (stellarconnect.Signer, error) {
+func FromSecret(secret string) (anchorsdk.Signer, error) {
 	kp, err := keypair.ParseFull(secret)
 	if err != nil {
 		return nil, fmt.Errorf("invalid secret key: %w", err)

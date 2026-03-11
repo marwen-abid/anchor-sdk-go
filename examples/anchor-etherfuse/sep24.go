@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	stellarconnect "github.com/marwen-abid/anchor-sdk-go"
+	anchorsdk "github.com/marwen-abid/anchor-sdk-go"
 	"github.com/marwen-abid/anchor-sdk-go/anchor"
 	"github.com/stellar/go/keypair"
 )
@@ -80,12 +80,12 @@ type etherfuseTransactionResponse struct {
 // mapStatusToSEP24 maps internal SDK statuses to SEP-24 spec statuses.
 // For Etherfuse withdrawals in pending_external with withdraw details available,
 // it returns pending_user_transfer_start so wallets prompt the user to send payment.
-func mapStatusToSEP24(transfer *stellarconnect.Transfer) string {
+func mapStatusToSEP24(transfer *anchorsdk.Transfer) string {
 	status := string(transfer.Status)
 
 	// Etherfuse withdrawal: once withdraw details are available, present as
 	// pending_user_transfer_start so the wallet knows to prompt the user.
-	if transfer.Kind == stellarconnect.KindWithdrawal && status == "pending_external" {
+	if transfer.Kind == anchorsdk.KindWithdrawal && status == "pending_external" {
 		if transfer.Metadata != nil {
 			if _, ok := transfer.Metadata["etherfuse_withdraw_anchor_account"]; ok {
 				return "pending_user_transfer_start"
@@ -105,7 +105,7 @@ func mapStatusToSEP24(transfer *stellarconnect.Transfer) string {
 
 // buildTransactionResponse creates an etherfuseTransactionResponse from a
 // Transfer and its status response, enriching it with Etherfuse metadata.
-func buildTransactionResponse(transfer *stellarconnect.Transfer, baseURL string) *etherfuseTransactionResponse {
+func buildTransactionResponse(transfer *anchorsdk.Transfer, baseURL string) *etherfuseTransactionResponse {
 	moreInfo := strings.TrimRight(baseURL, "/") + "/transaction/" + transfer.ID
 	resp := &etherfuseTransactionResponse{
 		ID:           transfer.ID,
@@ -121,9 +121,9 @@ func buildTransactionResponse(transfer *stellarconnect.Transfer, baseURL string)
 		Message:      transfer.Message,
 	}
 
-	if transfer.Kind == stellarconnect.KindDeposit {
+	if transfer.Kind == anchorsdk.KindDeposit {
 		resp.To = transfer.Account
-	} else if transfer.Kind == stellarconnect.KindWithdrawal {
+	} else if transfer.Kind == anchorsdk.KindWithdrawal {
 		resp.From = transfer.Account
 	}
 
@@ -213,7 +213,7 @@ func handleDepositInteractive(tm *anchor.TransferManager) http.HandlerFunc {
 			Account:   account,
 			AssetCode: assetCode,
 			Amount:    amount,
-			Mode:      stellarconnect.ModeInteractive,
+			Mode:      anchorsdk.ModeInteractive,
 		}
 
 		result, err := tm.InitiateDeposit(context.Background(), req)
@@ -269,7 +269,7 @@ func handleWithdrawInteractive(tm *anchor.TransferManager) http.HandlerFunc {
 			AssetCode: assetCode,
 			Amount:    amount,
 			Dest:      dest,
-			Mode:      stellarconnect.ModeInteractive,
+			Mode:      anchorsdk.ModeInteractive,
 		}
 
 		result, err := tm.InitiateWithdrawal(context.Background(), req)
@@ -291,7 +291,7 @@ func handleWithdrawInteractive(tm *anchor.TransferManager) http.HandlerFunc {
 }
 
 // handleGetTransaction returns the status of a single transfer.
-func handleGetTransaction(tm *anchor.TransferManager, store stellarconnect.TransferStore, baseURL string) http.HandlerFunc {
+func handleGetTransaction(tm *anchor.TransferManager, store anchorsdk.TransferStore, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, ok := anchor.ClaimsFromContext(r.Context())
 		if !ok {
@@ -330,7 +330,7 @@ func handleGetTransaction(tm *anchor.TransferManager, store stellarconnect.Trans
 }
 
 // handleGetTransactions returns a list of transfers for the authenticated account.
-func handleGetTransactions(store stellarconnect.TransferStore, baseURL string) http.HandlerFunc {
+func handleGetTransactions(store anchorsdk.TransferStore, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := anchor.ClaimsFromContext(r.Context())
 		if !ok {
@@ -348,15 +348,15 @@ func handleGetTransactions(store stellarconnect.TransferStore, baseURL string) h
 			return
 		}
 
-		filters := stellarconnect.TransferFilters{Account: claims.Subject}
+		filters := anchorsdk.TransferFilters{Account: claims.Subject}
 		if strings.TrimSpace(assetCode) != "" {
 			filters.AssetCode = assetCode
 		}
 		if kind == "deposit" {
-			k := stellarconnect.KindDeposit
+			k := anchorsdk.KindDeposit
 			filters.Kind = &k
 		} else if kind == "withdrawal" {
-			k := stellarconnect.KindWithdrawal
+			k := anchorsdk.KindWithdrawal
 			filters.Kind = &k
 		}
 
@@ -368,7 +368,7 @@ func handleGetTransactions(store stellarconnect.TransferStore, baseURL string) h
 
 		if noOlderThan != "" {
 			if cutoff, err := time.Parse(time.RFC3339, noOlderThan); err == nil {
-				filtered := make([]*stellarconnect.Transfer, 0, len(transfers))
+				filtered := make([]*anchorsdk.Transfer, 0, len(transfers))
 				for _, t := range transfers {
 					if !t.CreatedAt.Before(cutoff) {
 						filtered = append(filtered, t)
@@ -400,7 +400,7 @@ func handleGetTransactions(store stellarconnect.TransferStore, baseURL string) h
 }
 
 // handleMoreInfo serves the more_info_url page for a transaction.
-func handleMoreInfo(store stellarconnect.TransferStore) http.HandlerFunc {
+func handleMoreInfo(store anchorsdk.TransferStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		if id == "" {

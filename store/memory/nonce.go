@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	stellarconnect "github.com/marwen-abid/anchor-sdk-go"
+	anchorsdk "github.com/marwen-abid/anchor-sdk-go"
 )
 
 // nonceEntry represents a stored nonce with its expiration and consumption state.
@@ -16,7 +16,7 @@ type nonceEntry struct {
 	Consumed  bool
 }
 
-// NonceStore is an in-memory implementation of stellarconnect.NonceStore.
+// NonceStore is an in-memory implementation of anchorsdk.NonceStore.
 // It stores nonces with expiration times and tracks consumption state.
 // Access is protected by sync.RWMutex for thread safety.
 type NonceStore struct {
@@ -86,5 +86,5 @@ func (s *NonceStore) Consume(ctx context.Context, nonce string) (bool, error) {
 	return true, nil
 }
 
-// Verify that NonceStore implements stellarconnect.NonceStore
-var _ stellarconnect.NonceStore = (*NonceStore)(nil)
+// Verify that NonceStore implements anchorsdk.NonceStore
+var _ anchorsdk.NonceStore = (*NonceStore)(nil)

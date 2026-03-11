@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	stellarconnect "github.com/marwen-abid/anchor-sdk-go"
+	anchorsdk "github.com/marwen-abid/anchor-sdk-go"
 	"github.com/marwen-abid/anchor-sdk-go/errors"
 )
 
@@ -16,10 +16,10 @@ import (
 // It manages client-side status polling with adaptive backoff and event emission.
 type TransferProcess struct {
 	ID             string
-	Status         stellarconnect.TransferStatus
+	Status         anchorsdk.TransferStatus
 	InteractiveURL string
 
-	onStatusChange func(stellarconnect.TransferStatus)
+	onStatusChange func(anchorsdk.TransferStatus)
 	onInteractive  func(string)
 
 	session  *Session
@@ -28,7 +28,7 @@ type TransferProcess struct {
 
 // OnStatusChange registers a callback invoked when the transfer status changes.
 // The handler receives the new status value.
-func (t *TransferProcess) OnStatusChange(handler func(stellarconnect.TransferStatus)) {
+func (t *TransferProcess) OnStatusChange(handler func(anchorsdk.TransferStatus)) {
 	t.onStatusChange = handler
 }
 
@@ -93,7 +93,7 @@ func (t *TransferProcess) Poll(ctx context.Context) error {
 	}
 
 	oldStatus := t.Status
-	newStatus := stellarconnect.TransferStatus(pollResp.Transaction.Status)
+	newStatus := anchorsdk.TransferStatus(pollResp.Transaction.Status)
 
 	if newStatus != oldStatus {
 		t.Status = newStatus
@@ -135,11 +135,11 @@ func (t *TransferProcess) WaitForCompletion(ctx context.Context) error {
 
 func (t *TransferProcess) isTerminal() bool {
 	switch t.Status {
-	case stellarconnect.StatusCompleted,
-		stellarconnect.StatusFailed,
-		stellarconnect.StatusDenied,
-		stellarconnect.StatusCancelled,
-		stellarconnect.StatusExpired:
+	case anchorsdk.StatusCompleted,
+		anchorsdk.StatusFailed,
+		anchorsdk.StatusDenied,
+		anchorsdk.StatusCancelled,
+		anchorsdk.StatusExpired:
 		return true
 	default:
 		return false

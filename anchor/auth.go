@@ -28,21 +28,21 @@ var claimsContextKey = authClaimsContextKey{}
 type AuthConfig struct {
 	Domain            string
 	NetworkPassphrase string
-	Signer            stellarconnect.Signer
-	NonceStore        stellarconnect.NonceStore
-	JWTIssuer         stellarconnect.JWTIssuer
-	JWTVerifier       stellarconnect.JWTVerifier
-	AccountFetcher    stellarconnect.AccountFetcher // Optional: enables account signer support
+	Signer            anchorsdk.Signer
+	NonceStore        anchorsdk.NonceStore
+	JWTIssuer         anchorsdk.JWTIssuer
+	JWTVerifier       anchorsdk.JWTVerifier
+	AccountFetcher    anchorsdk.AccountFetcher // Optional: enables account signer support
 }
 
 type AuthIssuer struct {
 	domain            string
 	networkPassphrase string
-	signer            stellarconnect.Signer
-	nonceStore        stellarconnect.NonceStore
-	jwtIssuer         stellarconnect.JWTIssuer
-	jwtVerifier       stellarconnect.JWTVerifier
-	accountFetcher    stellarconnect.AccountFetcher
+	signer            anchorsdk.Signer
+	nonceStore        anchorsdk.NonceStore
+	jwtIssuer         anchorsdk.JWTIssuer
+	jwtVerifier       anchorsdk.JWTVerifier
+	accountFetcher    anchorsdk.AccountFetcher
 }
 
 func NewAuthIssuer(config AuthConfig) (*AuthIssuer, error) {
@@ -193,7 +193,7 @@ func (a *AuthIssuer) VerifyChallenge(ctx context.Context, challengeXDR string) (
 		return "", errors.NewAnchorError(errors.CHALLENGE_VERIFY_FAILED, "web_auth_domain value mismatch", nil)
 	}
 
-	claims := stellarconnect.JWTClaims{
+	claims := anchorsdk.JWTClaims{
 		Subject:    account,
 		Issuer:     a.domain,
 		AuthMethod: authMethodWebAuth,
@@ -245,12 +245,12 @@ func (a *AuthIssuer) RequireAuth(next http.Handler) http.Handler {
 	})
 }
 
-func ClaimsFromContext(ctx context.Context) (*stellarconnect.JWTClaims, bool) {
-	claims, ok := ctx.Value(claimsContextKey).(*stellarconnect.JWTClaims)
+func ClaimsFromContext(ctx context.Context) (*anchorsdk.JWTClaims, bool) {
+	claims, ok := ctx.Value(claimsContextKey).(*anchorsdk.JWTClaims)
 	return claims, ok
 }
 
-func verifyChallengeSignatures(ctx context.Context, tx *txnbuild.Transaction, networkPassphrase, serverPublicKey, clientAccount string, fetcher stellarconnect.AccountFetcher) error {
+func verifyChallengeSignatures(ctx context.Context, tx *txnbuild.Transaction, networkPassphrase, serverPublicKey, clientAccount string, fetcher anchorsdk.AccountFetcher) error {
 	serverKP, err := keypair.ParseAddress(serverPublicKey)
 	if err != nil {
 		return errors.NewAnchorError(errors.CHALLENGE_VERIFY_FAILED, "invalid server public key", err)

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	stellarconnect "github.com/marwen-abid/anchor-sdk-go"
+	anchorsdk "github.com/marwen-abid/anchor-sdk-go"
 	corecrypto "github.com/marwen-abid/anchor-sdk-go/core/crypto"
 	"github.com/marwen-abid/anchor-sdk-go/errors"
 )
@@ -24,7 +24,7 @@ type Config struct {
 }
 
 type TransferManager struct {
-	store         stellarconnect.TransferStore
+	store         anchorsdk.TransferStore
 	config        Config
 	hooks         *HookRegistry
 	tokenMu       sync.Mutex
@@ -33,7 +33,7 @@ type TransferManager struct {
 	transferLocks map[string]*sync.Mutex
 }
 
-func NewTransferManager(store stellarconnect.TransferStore, config Config, hooks *HookRegistry) *TransferManager {
+func NewTransferManager(store anchorsdk.TransferStore, config Config, hooks *HookRegistry) *TransferManager {
 	if hooks == nil {
 		hooks = NewHookRegistry()
 	}
@@ -62,7 +62,7 @@ type DepositRequest struct {
 	Account   string
 	AssetCode string
 	Amount    string
-	Mode      stellarconnect.TransferMode
+	Mode      anchorsdk.TransferMode
 	Metadata  map[string]any
 }
 
@@ -77,7 +77,7 @@ type WithdrawalRequest struct {
 	Account   string
 	AssetCode string
 	Amount    string
-	Mode      stellarconnect.TransferMode
+	Mode      anchorsdk.TransferMode
 	Dest      string
 	DestExtra string
 	Metadata  map[string]any
@@ -142,11 +142,11 @@ func (tm *TransferManager) InitiateDeposit(ctx context.Context, req DepositReque
 	}
 
 	now := time.Now()
-	transfer := &stellarconnect.Transfer{
+	transfer := &anchorsdk.Transfer{
 		ID:        id,
-		Kind:      stellarconnect.KindDeposit,
+		Kind:      anchorsdk.KindDeposit,
 		Mode:      req.Mode,
-		Status:    stellarconnect.StatusInitiating,
+		Status:    anchorsdk.StatusInitiating,
 		AssetCode: req.AssetCode,
 		Account:   req.Account,
 		Amount:    req.Amount,
@@ -155,26 +155,26 @@ func (tm *TransferManager) InitiateDeposit(ctx context.Context, req DepositReque
 		UpdatedAt: now,
 	}
 
-	if req.Mode == stellarconnect.ModeInteractive {
+	if req.Mode == anchorsdk.ModeInteractive {
 		token, url, err := tm.generateInteractiveURL(id)
 		if err != nil {
 			return nil, err
 		}
 		transfer.InteractiveToken = token
 		transfer.InteractiveURL = url
-		transfer.Status = stellarconnect.StatusInteractive
+		transfer.Status = anchorsdk.StatusInteractive
 	}
 
 	if err := tm.store.Save(ctx, transfer); err != nil {
 		return nil, errors.NewAnchorError(errors.STORE_ERROR, "failed to save transfer", err)
 	}
 
-	if transfer.Mode == stellarconnect.ModeInteractive {
+	if transfer.Mode == anchorsdk.ModeInteractive {
 		tm.hooks.Trigger(HookDepositInitiated, transfer)
 		return &DepositResult{ID: transfer.ID, InteractiveURL: transfer.InteractiveURL}, nil
 	}
 
-	if err := tm.transition(ctx, transfer.ID, stellarconnect.StatusPendingExternal, ""); err != nil {
+	if err := tm.transition(ctx, transfer.ID, anchorsdk.StatusPendingExternal, ""); err != nil {
 		return nil, err
 	}
 	tm.hooks.Trigger(HookDepositInitiated, transfer)
@@ -195,11 +195,11 @@ func (tm *TransferManager) InitiateWithdrawal(ctx context.Context, req Withdrawa
 	}
 
 	now := time.Now()
-	transfer := &stellarconnect.Transfer{
+	transfer := &anchorsdk.Transfer{
 		ID:        id,
-		Kind:      stellarconnect.KindWithdrawal,
+		Kind:      anchorsdk.KindWithdrawal,
 		Mode:      req.Mode,
-		Status:    stellarconnect.StatusInitiating,
+		Status:    anchorsdk.StatusInitiating,
 		AssetCode: req.AssetCode,
 		Account:   req.Account,
 		Amount:    req.Amount,
@@ -208,16 +208,16 @@ func (tm *TransferManager) InitiateWithdrawal(ctx context.Context, req Withdrawa
 		UpdatedAt: now,
 	}
 
-	if req.Mode == stellarconnect.ModeInteractive {
+	if req.Mode == anchorsdk.ModeInteractive {
 		token, url, err := tm.generateInteractiveURL(id)
 		if err != nil {
 			return nil, err
 		}
 		transfer.InteractiveToken = token
 		transfer.InteractiveURL = url
-		transfer.Status = stellarconnect.StatusInteractive
+		transfer.Status = anchorsdk.StatusInteractive
 	} else {
-		transfer.Status = stellarconnect.StatusPaymentRequired
+		transfer.Status = anchorsdk.StatusPaymentRequired
 	}
 
 	if err := tm.store.Save(ctx, transfer); err != nil {
@@ -241,20 +241,20 @@ func (tm *TransferManager) CompleteInteractive(ctx context.Context, transferID s
 	if err != nil {
 		return errors.NewAnchorError(errors.STORE_ERROR, "failed to load transfer", err)
 	}
-	if transfer.Mode != stellarconnect.ModeInteractive {
+	if transfer.Mode != anchorsdk.ModeInteractive {
 		return errors.NewAnchorError(errors.TRANSITION_INVALID, "transfer not in interactive mode", nil)
 	}
 
-	next := stellarconnect.StatusPendingExternal
-	if transfer.Kind == stellarconnect.KindDeposit {
-		next = stellarconnect.StatusPendingUserTransferStart
+	next := anchorsdk.StatusPendingExternal
+	if transfer.Kind == anchorsdk.KindDeposit {
+		next = anchorsdk.StatusPendingUserTransferStart
 	}
 	return tm.transition(ctx, transferID, next, "")
 }
 
 // PeekInteractiveToken validates the token without consuming it.
 // Use this for GET requests that display the interactive form.
-func (tm *TransferManager) PeekInteractiveToken(ctx context.Context, token string) (*stellarconnect.Transfer, error) {
+func (tm *TransferManager) PeekInteractiveToken(ctx context.Context, token string) (*anchorsdk.Transfer, error) {
 	tm.tokenMu.Lock()
 	transferID, ok := tm.tokenToID[token]
 	tm.tokenMu.Unlock()
@@ -270,7 +270,7 @@ func (tm *TransferManager) PeekInteractiveToken(ctx context.Context, token strin
 
 // ConsumeInteractiveToken validates and deletes the token.
 // Use this for POST requests that finalize the interactive flow.
-func (tm *TransferManager) ConsumeInteractiveToken(ctx context.Context, token string) (*stellarconnect.Transfer, error) {
+func (tm *TransferManager) ConsumeInteractiveToken(ctx context.Context, token string) (*anchorsdk.Transfer, error) {
 	tm.tokenMu.Lock()
 	transferID, ok := tm.tokenToID[token]
 	if ok {
@@ -288,43 +288,43 @@ func (tm *TransferManager) ConsumeInteractiveToken(ctx context.Context, token st
 }
 
 // VerifyInteractiveToken validates and deletes the token (alias for ConsumeInteractiveToken).
-func (tm *TransferManager) VerifyInteractiveToken(ctx context.Context, token string) (*stellarconnect.Transfer, error) {
+func (tm *TransferManager) VerifyInteractiveToken(ctx context.Context, token string) (*anchorsdk.Transfer, error) {
 	return tm.ConsumeInteractiveToken(ctx, token)
 }
 
 func (tm *TransferManager) NotifyFundsReceived(ctx context.Context, transferID string, details FundsReceivedDetails) error {
-	update := &stellarconnect.TransferUpdate{ExternalRef: &details.ExternalRef}
+	update := &anchorsdk.TransferUpdate{ExternalRef: &details.ExternalRef}
 	if strings.TrimSpace(details.Amount) != "" {
 		update.Amount = &details.Amount
 	}
-	return tm.updateAndTransition(ctx, transferID, update, stellarconnect.StatusPendingStellar, HookDepositFundsReceived)
+	return tm.updateAndTransition(ctx, transferID, update, anchorsdk.StatusPendingStellar, HookDepositFundsReceived)
 }
 
 func (tm *TransferManager) NotifyPaymentSent(ctx context.Context, transferID string, details PaymentSentDetails) error {
-	update := &stellarconnect.TransferUpdate{StellarTxHash: &details.StellarTxHash}
+	update := &anchorsdk.TransferUpdate{StellarTxHash: &details.StellarTxHash}
 	completedAt := time.Now()
 	update.CompletedAt = &completedAt
-	return tm.updateAndTransition(ctx, transferID, update, stellarconnect.StatusCompleted, HookTransferStatusChanged)
+	return tm.updateAndTransition(ctx, transferID, update, anchorsdk.StatusCompleted, HookTransferStatusChanged)
 }
 
 func (tm *TransferManager) NotifyPaymentReceived(ctx context.Context, transferID string, details PaymentReceivedDetails) error {
-	update := &stellarconnect.TransferUpdate{StellarTxHash: &details.StellarTxHash}
-	return tm.updateAndTransition(ctx, transferID, update, stellarconnect.StatusPendingStellar, HookWithdrawalStellarPaymentSent)
+	update := &anchorsdk.TransferUpdate{StellarTxHash: &details.StellarTxHash}
+	return tm.updateAndTransition(ctx, transferID, update, anchorsdk.StatusPendingStellar, HookWithdrawalStellarPaymentSent)
 }
 
 func (tm *TransferManager) NotifyDisbursementSent(ctx context.Context, transferID string, details DisbursementDetails) error {
-	update := &stellarconnect.TransferUpdate{ExternalRef: &details.ExternalRef}
+	update := &anchorsdk.TransferUpdate{ExternalRef: &details.ExternalRef}
 	completedAt := time.Now()
 	update.CompletedAt = &completedAt
-	return tm.updateAndTransition(ctx, transferID, update, stellarconnect.StatusCompleted, HookTransferStatusChanged)
+	return tm.updateAndTransition(ctx, transferID, update, anchorsdk.StatusCompleted, HookTransferStatusChanged)
 }
 
 func (tm *TransferManager) Deny(ctx context.Context, transferID string, reason string) error {
-	return tm.transition(ctx, transferID, stellarconnect.StatusDenied, reason)
+	return tm.transition(ctx, transferID, anchorsdk.StatusDenied, reason)
 }
 
 func (tm *TransferManager) Cancel(ctx context.Context, transferID string, reason string) error {
-	return tm.transition(ctx, transferID, stellarconnect.StatusCancelled, reason)
+	return tm.transition(ctx, transferID, anchorsdk.StatusCancelled, reason)
 }
 
 func (tm *TransferManager) GetStatus(ctx context.Context, transferID string) (*TransferStatusResponse, error) {
@@ -351,15 +351,15 @@ func (tm *TransferManager) GetStatus(ctx context.Context, transferID string) (*T
 		Message:      transfer.Message,
 	}
 	// SEP-24: deposits require "to" (user's Stellar account), withdrawals require "from"
-	if transfer.Kind == stellarconnect.KindDeposit {
+	if transfer.Kind == anchorsdk.KindDeposit {
 		resp.To = transfer.Account
-	} else if transfer.Kind == stellarconnect.KindWithdrawal {
+	} else if transfer.Kind == anchorsdk.KindWithdrawal {
 		resp.From = transfer.Account
 	}
 	return resp, nil
 }
 
-func (tm *TransferManager) updateAndTransition(ctx context.Context, transferID string, update *stellarconnect.TransferUpdate, next stellarconnect.TransferStatus, hook HookEvent) error {
+func (tm *TransferManager) updateAndTransition(ctx context.Context, transferID string, update *anchorsdk.TransferUpdate, next anchorsdk.TransferStatus, hook HookEvent) error {
 	mu := tm.lockForTransfer(transferID)
 	mu.Lock()
 	defer mu.Unlock()
@@ -383,7 +383,7 @@ func (tm *TransferManager) updateAndTransition(ctx context.Context, transferID s
 	return nil
 }
 
-func (tm *TransferManager) transition(ctx context.Context, transferID string, next stellarconnect.TransferStatus, message string) error {
+func (tm *TransferManager) transition(ctx context.Context, transferID string, next anchorsdk.TransferStatus, message string) error {
 	mu := tm.lockForTransfer(transferID)
 	mu.Lock()
 	defer mu.Unlock()
@@ -395,11 +395,11 @@ func (tm *TransferManager) transition(ctx context.Context, transferID string, ne
 	if err := ValidateTransition(transfer.Status, next); err != nil {
 		return err
 	}
-	update := &stellarconnect.TransferUpdate{Status: &next}
+	update := &anchorsdk.TransferUpdate{Status: &next}
 	if strings.TrimSpace(message) != "" {
 		update.Message = &message
 	}
-	if next == stellarconnect.StatusCompleted {
+	if next == anchorsdk.StatusCompleted {
 		completedAt := time.Now()
 		update.CompletedAt = &completedAt
 	}
@@ -433,13 +433,13 @@ func (tm *TransferManager) generateInteractiveURL(transferID string) (string, st
 	return token, url, nil
 }
 
-func isTerminal(status stellarconnect.TransferStatus) bool {
+func isTerminal(status anchorsdk.TransferStatus) bool {
 	switch status {
-	case stellarconnect.StatusCompleted,
-		stellarconnect.StatusFailed,
-		stellarconnect.StatusDenied,
-		stellarconnect.StatusCancelled,
-		stellarconnect.StatusExpired:
+	case anchorsdk.StatusCompleted,
+		anchorsdk.StatusFailed,
+		anchorsdk.StatusDenied,
+		anchorsdk.StatusCancelled,
+		anchorsdk.StatusExpired:
 		return true
 	default:
 		return false

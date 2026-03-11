@@ -1,11 +1,11 @@
-// Package anchor provides anchor-specific implementations for the Stellar Connect SDK,
+// Package anchor provides anchor-specific implementations for the Stellar Anchor SDK,
 // including authentication, transfer management, and lifecycle event handling.
 package anchor
 
 import (
 	"sync"
 
-	stellarconnect "github.com/marwen-abid/anchor-sdk-go"
+	anchorsdk "github.com/marwen-abid/anchor-sdk-go"
 )
 
 // HookEvent represents a named lifecycle event that anchors can subscribe to.
@@ -28,14 +28,14 @@ const (
 // Handlers are stored per event and execute in registration order.
 // The registry is thread-safe for concurrent registration and triggering.
 type HookRegistry struct {
-	handlers map[HookEvent][]func(*stellarconnect.Transfer)
+	handlers map[HookEvent][]func(*anchorsdk.Transfer)
 	mu       sync.RWMutex
 }
 
 // NewHookRegistry creates a new lifecycle hook registry.
 func NewHookRegistry() *HookRegistry {
 	return &HookRegistry{
-		handlers: make(map[HookEvent][]func(*stellarconnect.Transfer)),
+		handlers: make(map[HookEvent][]func(*anchorsdk.Transfer)),
 	}
 }
 
@@ -46,7 +46,7 @@ func NewHookRegistry() *HookRegistry {
 // The handler receives a pointer to the Transfer that triggered the event.
 // Handlers should be quick, non-blocking operations. If a handler panics,
 // the panic will propagate and prevent subsequent handlers from executing.
-func (r *HookRegistry) On(event HookEvent, handler func(*stellarconnect.Transfer)) {
+func (r *HookRegistry) On(event HookEvent, handler func(*anchorsdk.Transfer)) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -59,7 +59,7 @@ func (r *HookRegistry) On(event HookEvent, handler func(*stellarconnect.Transfer
 //
 // If any handler panics, the panic propagates to the caller and subsequent
 // handlers do not execute.
-func (r *HookRegistry) Trigger(event HookEvent, transfer *stellarconnect.Transfer) {
+func (r *HookRegistry) Trigger(event HookEvent, transfer *anchorsdk.Transfer) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

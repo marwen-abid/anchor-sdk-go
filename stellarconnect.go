@@ -1,8 +1,8 @@
-// Package stellarconnect provides a Go SDK for implementing Stellar anchor services.
+// Package anchorsdk provides a Go SDK for implementing Stellar anchor services.
 // It handles SEP-10 authentication, SEP-24 interactive flows, SEP-6 transfer protocols,
 // and payment observation while delegating key signing, persistence, and business logic
 // to the developer.
-package stellarconnect
+package anchorsdk
 
 import (
 	"context"
@@ -184,7 +184,7 @@ type JWTVerifier interface {
 	Verify(ctx context.Context, token string) (*JWTClaims, error)
 }
 
-// JWTClaims are the standard claims for a Stellar Connect auth token.
+// JWTClaims are the standard claims for a Stellar Anchor auth token.
 type JWTClaims struct {
 	Subject    string // Stellar address (G...)
 	Issuer     string // Anchor domain

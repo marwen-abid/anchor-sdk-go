@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	stellarconnect "github.com/marwen-abid/anchor-sdk-go"
+	anchorsdk "github.com/marwen-abid/anchor-sdk-go"
 	"github.com/stellar/go-stellar-sdk/clients/horizonclient"
 )
 
-// HorizonAccountFetcher implements stellarconnect.AccountFetcher using a Horizon server.
+// HorizonAccountFetcher implements anchorsdk.AccountFetcher using a Horizon server.
 type HorizonAccountFetcher struct {
 	client *horizonclient.Client
 }
@@ -21,23 +21,23 @@ func NewHorizonAccountFetcher(horizonURL string) *HorizonAccountFetcher {
 }
 
 // FetchSigners returns the signers and thresholds for a Stellar account.
-func (f *HorizonAccountFetcher) FetchSigners(_ context.Context, accountID string) ([]stellarconnect.AccountSigner, stellarconnect.AccountThresholds, error) {
+func (f *HorizonAccountFetcher) FetchSigners(_ context.Context, accountID string) ([]anchorsdk.AccountSigner, anchorsdk.AccountThresholds, error) {
 	account, err := f.client.AccountDetail(horizonclient.AccountRequest{
 		AccountID: accountID,
 	})
 	if err != nil {
-		return nil, stellarconnect.AccountThresholds{}, fmt.Errorf("failed to fetch account %s: %w", accountID, err)
+		return nil, anchorsdk.AccountThresholds{}, fmt.Errorf("failed to fetch account %s: %w", accountID, err)
 	}
 
-	signers := make([]stellarconnect.AccountSigner, len(account.Signers))
+	signers := make([]anchorsdk.AccountSigner, len(account.Signers))
 	for i, s := range account.Signers {
-		signers[i] = stellarconnect.AccountSigner{
+		signers[i] = anchorsdk.AccountSigner{
 			Key:    s.Key,
 			Weight: s.Weight,
 		}
 	}
 
-	thresholds := stellarconnect.AccountThresholds{
+	thresholds := anchorsdk.AccountThresholds{
 		Low:    account.Thresholds.LowThreshold,
 		Medium: account.Thresholds.MedThreshold,
 		High:   account.Thresholds.HighThreshold,

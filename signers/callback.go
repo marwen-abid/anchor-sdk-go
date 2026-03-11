@@ -18,7 +18,7 @@ type callbackSigner struct {
 func FromCallback(
 	publicKey string,
 	signFunc func(context.Context, string, string) (string, error),
-) stellarconnect.Signer {
+) anchorsdk.Signer {
 	return &callbackSigner{
 		publicKey: publicKey,
 		signFunc:  signFunc,

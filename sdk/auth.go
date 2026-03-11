@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	stellarconnect "github.com/marwen-abid/anchor-sdk-go"
+	anchorsdk "github.com/marwen-abid/anchor-sdk-go"
 	"github.com/marwen-abid/anchor-sdk-go/errors"
 )
 
@@ -48,7 +48,7 @@ func (s *Session) IsValid() bool {
 //
 // The returned Session contains the JWT token for making authenticated
 // requests to the anchor's services (SEP-24, SEP-6, etc.).
-func (c *Client) Login(ctx context.Context, account, homeDomain string, signer stellarconnect.Signer) (*Session, error) {
+func (c *Client) Login(ctx context.Context, account, homeDomain string, signer anchorsdk.Signer) (*Session, error) {
 	// Step 1: Discover anchor's WEB_AUTH_ENDPOINT via stellar.toml
 	anchorInfo, err := c.tomlResolver.Resolve(ctx, homeDomain)
 	if err != nil {
@@ -285,7 +285,7 @@ func (s *Session) initiateTransfer(ctx context.Context, kind string, assetCode s
 
 	process := &TransferProcess{
 		ID:             transferResp.ID,
-		Status:         stellarconnect.StatusInteractive,
+		Status:         anchorsdk.StatusInteractive,
 		InteractiveURL: transferResp.URL,
 		session:        s,
 		endpoint:       anchorInfo.TransferServerSep24,

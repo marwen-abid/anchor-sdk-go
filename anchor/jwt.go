@@ -24,7 +24,7 @@ type hmacJWT struct {
 
 // NewHMACJWT returns a JWTIssuer and JWTVerifier backed by HMAC-SHA256.
 // The same instance implements both interfaces for symmetric key operations.
-func NewHMACJWT(secret []byte, issuer string, expiry time.Duration) (stellarconnect.JWTIssuer, stellarconnect.JWTVerifier) {
+func NewHMACJWT(secret []byte, issuer string, expiry time.Duration) (anchorsdk.JWTIssuer, anchorsdk.JWTVerifier) {
 	jwt := &hmacJWT{
 		secret: secret,
 		issuer: issuer,
@@ -50,7 +50,7 @@ type jwtPayload struct {
 }
 
 // Issue creates a JWT token with the given claims.
-func (j *hmacJWT) Issue(ctx context.Context, claims stellarconnect.JWTClaims) (string, error) {
+func (j *hmacJWT) Issue(ctx context.Context, claims anchorsdk.JWTClaims) (string, error) {
 	// Build header
 	header := jwtHeader{
 		Alg: "HS256",
@@ -91,7 +91,7 @@ func (j *hmacJWT) Issue(ctx context.Context, claims stellarconnect.JWTClaims) (s
 }
 
 // Verify validates a JWT token and returns the claims.
-func (j *hmacJWT) Verify(ctx context.Context, token string) (*stellarconnect.JWTClaims, error) {
+func (j *hmacJWT) Verify(ctx context.Context, token string) (*anchorsdk.JWTClaims, error) {
 	// Split token into parts
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
@@ -133,7 +133,7 @@ func (j *hmacJWT) Verify(ctx context.Context, token string) (*stellarconnect.JWT
 	}
 
 	// Convert to JWTClaims
-	claims := &stellarconnect.JWTClaims{
+	claims := &anchorsdk.JWTClaims{
 		Subject:    payload.Sub,
 		Issuer:     payload.Iss,
 		IssuedAt:   time.Unix(payload.Iat, 0),

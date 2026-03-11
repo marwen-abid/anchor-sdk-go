@@ -3,7 +3,7 @@
 > 
 # Anchor SDK Go — v1 Implementation Guide
 
-This document describes the **actual v1 implementation** of the Stellar Connect SDK for Go. For the ideal design and future roadmap, see [rfc.md](./rfc.md).
+This document describes the **actual v1 implementation** of the Stellar Anchor SDK for Go. For the ideal design and future roadmap, see [rfc.md](./rfc.md).
 
 ## Installation
 
