@@ -6,6 +6,7 @@ import (
 	"crypto/sha1"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -89,7 +90,7 @@ type QuoteResponse struct {
 
 // CreateQuote creates a quote for an onramp or offramp conversion.
 // Quotes expire after 2 minutes.
-func (c *EtherfuseClient) CreateQuote(ctx context.Context, req QuoteRequest) (*QuoteResponse, error) {
+func (c *EtherfuseClient) CreateQuote(ctx context.Context, req QuoteRequest) (*QuoteResponse, error) { //nolint:gocritic
 	req.Blockchain = "stellar"
 	var resp QuoteResponse
 	if err := c.post(ctx, "/ramp/quote", req, &resp); err != nil {
@@ -138,7 +139,7 @@ func (c *EtherfuseClient) CreateOnrampOrder(ctx context.Context, req OrderReques
 		return nil, fmt.Errorf("create onramp order: %w", err)
 	}
 	if resp.Onramp == nil {
-		return nil, fmt.Errorf("unexpected response: missing onramp field")
+		return nil, errors.New("unexpected response: missing onramp field")
 	}
 	return resp.Onramp, nil
 }
@@ -152,7 +153,7 @@ func (c *EtherfuseClient) CreateOfframpOrder(ctx context.Context, req OrderReque
 		return nil, fmt.Errorf("create offramp order: %w", err)
 	}
 	if resp.Offramp == nil {
-		return nil, fmt.Errorf("unexpected response: missing offramp field")
+		return nil, errors.New("unexpected response: missing offramp field")
 	}
 	return resp.Offramp, nil
 }
@@ -192,7 +193,7 @@ type assetsResponse struct {
 
 // GetAssets returns the list of rampable assets on Stellar.
 func (c *EtherfuseClient) GetAssets(ctx context.Context, wallet string) ([]EtherfuseAsset, error) {
-	path := fmt.Sprintf("/ramp/assets?blockchain=stellar&currency=mxn&wallet=%s", wallet)
+	path := "/ramp/assets?blockchain=stellar&currency=mxn&wallet=" + wallet
 	var resp assetsResponse
 	if err := c.get(ctx, path, &resp); err != nil {
 		return nil, fmt.Errorf("get assets: %w", err)
@@ -219,7 +220,7 @@ type OrderDetails struct {
 
 // GetOrder fetches the current state of an order by ID.
 func (c *EtherfuseClient) GetOrder(ctx context.Context, orderID string) (*OrderDetails, error) {
-	path := fmt.Sprintf("/ramp/order/%s", orderID)
+	path := "/ramp/order/" + orderID
 	var resp OrderDetails
 	if err := c.get(ctx, path, &resp); err != nil {
 		return nil, fmt.Errorf("get order: %w", err)
@@ -229,7 +230,7 @@ func (c *EtherfuseClient) GetOrder(ctx context.Context, orderID string) (*OrderD
 
 // --- HTTP helpers ---
 
-func (c *EtherfuseClient) post(ctx context.Context, path string, body any, result any) error {
+func (c *EtherfuseClient) post(ctx context.Context, path string, body, result any) error {
 	data, err := json.Marshal(body)
 	if err != nil {
 		return fmt.Errorf("marshal request: %w", err)
@@ -245,7 +246,7 @@ func (c *EtherfuseClient) post(ctx context.Context, path string, body any, resul
 	if err != nil {
 		return fmt.Errorf("HTTP request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -263,7 +264,7 @@ func (c *EtherfuseClient) post(ctx context.Context, path string, body any, resul
 }
 
 func (c *EtherfuseClient) get(ctx context.Context, path string, result any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, http.NoBody)
 	if err != nil {
 		return err
 	}
@@ -273,7 +274,7 @@ func (c *EtherfuseClient) get(ctx context.Context, path string, result any) erro
 	if err != nil {
 		return fmt.Errorf("HTTP request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {

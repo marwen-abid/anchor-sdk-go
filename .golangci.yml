@@ -23,7 +23,8 @@ linters:
 
     gosec:
       excludes:
-        - G101
+        - G101 # hardcoded credentials (dev examples use test keys intentionally)
+        - G107 # url from variable (core HTTP client intentionally accepts caller-supplied URLs)
 
     govet:
       enable-all: true
@@ -36,6 +37,9 @@ linters:
         linters:
           - gosec
           - unparam
+      - path: core/net/
+        linters:
+          - gosec
 
 formatters:
   enable:
@@ -45,7 +49,3 @@ formatters:
     gofumpt:
       extra-rules: true
 
-issues:
-  exclude-dirs:
-    - .idea
-    - .sisyphus

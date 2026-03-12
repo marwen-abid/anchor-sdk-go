@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -76,7 +77,7 @@ func handleWebhook(
 			http.Error(w, "failed to read body", http.StatusBadRequest)
 			return
 		}
-		defer r.Body.Close()
+		defer func() { _ = r.Body.Close() }()
 
 		// Verify HMAC-SHA256 signature
 		sig := r.Header.Get("X-Signature")
@@ -400,7 +401,7 @@ func findTransferByOrderID(ctx context.Context, store anchorsdk.TransferStore, o
 // and extracts the destination account, memo, and memo type from the payment operation.
 // This is used to populate withdraw_anchor_account, withdraw_memo, and withdraw_memo_type
 // for SEP-24 withdrawal compliance (design doc section 6.6, Option A).
-func decodeBurnTransaction(xdrBase64 string, networkPassphrase string) (account string, memo string, memoType string, err error) {
+func decodeBurnTransaction(xdrBase64, networkPassphrase string) (account, memo, memoType string, err error) {
 	parsed, err := txnbuild.TransactionFromXDR(xdrBase64)
 	if err != nil {
 		return "", "", "", fmt.Errorf("parse XDR: %w", err)
@@ -410,7 +411,7 @@ func decodeBurnTransaction(xdrBase64 string, networkPassphrase string) (account 
 	if t, ok := parsed.Transaction(); ok {
 		tx = t
 	} else {
-		return "", "", "", fmt.Errorf("expected Transaction, got FeeBumpTransaction")
+		return "", "", "", errors.New("expected Transaction, got FeeBumpTransaction")
 	}
 
 	// Extract memo and memo type
@@ -419,7 +420,7 @@ func decodeBurnTransaction(xdrBase64 string, networkPassphrase string) (account 
 		if err == nil {
 			switch memoXDR.Type {
 			case xdr.MemoTypeMemoText:
-				memo = string(memoXDR.MustText())
+				memo = memoXDR.MustText()
 				memoType = "text"
 			case xdr.MemoTypeMemoId:
 				memo = fmt.Sprintf("%d", memoXDR.MustId())
@@ -439,7 +440,7 @@ func decodeBurnTransaction(xdrBase64 string, networkPassphrase string) (account 
 		}
 	}
 
-	return "", "", "", fmt.Errorf("no payment operation found in burnTransaction")
+	return "", "", "", errors.New("no payment operation found in burnTransaction")
 }
 
 // mergeMetadata reads the current transfer metadata and merges new keys into it.

@@ -32,6 +32,6 @@ func (s *callbackSigner) PublicKey() string {
 
 // SignTransaction signs a Stellar transaction envelope (base64 XDR) by delegating to the callback function.
 // Returns the signed envelope as base64 XDR.
-func (s *callbackSigner) SignTransaction(ctx context.Context, xdr string, networkPassphrase string) (string, error) {
+func (s *callbackSigner) SignTransaction(ctx context.Context, xdr, networkPassphrase string) (string, error) {
 	return s.signFunc(ctx, xdr, networkPassphrase)
 }

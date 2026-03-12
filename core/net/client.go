@@ -96,8 +96,8 @@ type Response struct {
 }
 
 // Get performs an HTTP GET request with retry and circuit breaker logic.
-func (c *Client) Get(ctx context.Context, url string) (*Response, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+func (c *Client) Get(ctx context.Context, rawURL string) (*Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, http.NoBody)
 	if err != nil {
 		return nil, errors.NewCoreError(errors.NETWORK_ERROR, "failed to create GET request", err)
 	}
@@ -105,8 +105,8 @@ func (c *Client) Get(ctx context.Context, url string) (*Response, error) {
 }
 
 // Post performs an HTTP POST request with retry and circuit breaker logic.
-func (c *Client) Post(ctx context.Context, url string, body io.Reader) (*Response, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
+func (c *Client) Post(ctx context.Context, rawURL string, body io.Reader) (*Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, rawURL, body)
 	if err != nil {
 		return nil, errors.NewCoreError(errors.NETWORK_ERROR, "failed to create POST request", err)
 	}
@@ -143,7 +143,7 @@ func (c *Client) do(req *http.Request) (*Response, error) {
 		if err != nil {
 			return nil, errors.NewCoreError(errors.NETWORK_ERROR, "failed to read request body", err)
 		}
-		req.Body.Close()
+		_ = req.Body.Close()
 	}
 
 	var lastErr error
@@ -184,7 +184,7 @@ func (c *Client) do(req *http.Request) (*Response, error) {
 		// Check status code
 		if resp.StatusCode >= 500 {
 			// Server error - retry
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			lastErr = fmt.Errorf("server error: %d %s", resp.StatusCode, resp.Status)
 			if attempt < c.maxRetries {
 				c.backoff(attempt)

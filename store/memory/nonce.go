@@ -3,7 +3,7 @@ package memory
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"sync"
 	"time"
 
@@ -38,7 +38,7 @@ func (s *NonceStore) Add(ctx context.Context, nonce string, expiresAt time.Time)
 	defer s.mu.Unlock()
 
 	if _, exists := s.nonces[nonce]; exists {
-		return fmt.Errorf("nonce already exists")
+		return errors.New("nonce already exists")
 	}
 
 	s.nonces[nonce] = nonceEntry{

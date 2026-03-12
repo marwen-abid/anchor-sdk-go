@@ -53,9 +53,9 @@ func (r *Resolver) Resolve(ctx context.Context, domain string) (*AnchorInfo, err
 
 	resp, err := r.client.Get(ctx, url)
 	if err != nil {
-		return nil, errors.NewCoreError(errors.TOML_FETCH_FAILED, fmt.Sprintf("failed to fetch stellar.toml from %s", domain), err)
+		return nil, errors.NewCoreError(errors.TOML_FETCH_FAILED, "failed to fetch stellar.toml from "+domain, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		return nil, errors.NewCoreError(errors.TOML_FETCH_FAILED, fmt.Sprintf("stellar.toml fetch returned status %d", resp.StatusCode), nil)
@@ -66,13 +66,10 @@ func (r *Resolver) Resolve(ctx context.Context, domain string) (*AnchorInfo, err
 		return nil, errors.NewCoreError(errors.TOML_FETCH_FAILED, "failed to read stellar.toml response", err)
 	}
 
-	info, err := r.parse(string(body))
-	if err != nil {
-		return nil, err
-	}
+	info := r.parse(string(body))
 
 	if info.SigningKey != "" && !strings.HasPrefix(info.SigningKey, "G") {
-		return nil, errors.NewCoreError(errors.TOML_SIGNING_KEY_MISMATCH, fmt.Sprintf("invalid SIGNING_KEY format: %s", info.SigningKey), nil)
+		return nil, errors.NewCoreError(errors.TOML_SIGNING_KEY_MISMATCH, "invalid SIGNING_KEY format: "+info.SigningKey, nil)
 	}
 
 	r.mu.Lock()
@@ -85,7 +82,7 @@ func (r *Resolver) Resolve(ctx context.Context, domain string) (*AnchorInfo, err
 	return info, nil
 }
 
-func (r *Resolver) parse(content string) (*AnchorInfo, error) {
+func (r *Resolver) parse(content string) *AnchorInfo {
 	info := &AnchorInfo{}
 	lines := strings.Split(content, "\n")
 
@@ -138,7 +135,7 @@ func (r *Resolver) parse(content string) (*AnchorInfo, error) {
 			case "status":
 				currentCurrency.Status = value
 			case "display_decimals":
-				fmt.Sscanf(value, "%d", &currentCurrency.DisplayDecimals)
+				_, _ = fmt.Sscanf(value, "%d", &currentCurrency.DisplayDecimals)
 			case "anchor_asset_type":
 				currentCurrency.AnchorAssetType = value
 			case "description":
@@ -164,5 +161,5 @@ func (r *Resolver) parse(content string) (*AnchorInfo, error) {
 		info.Currencies = append(info.Currencies, *currentCurrency)
 	}
 
-	return info, nil
+	return info
 }

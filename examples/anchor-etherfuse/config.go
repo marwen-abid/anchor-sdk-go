@@ -2,7 +2,7 @@ package main
 
 import (
 	"bufio"
-	"fmt"
+	"errors"
 	"os"
 	"strconv"
 	"strings"
@@ -50,7 +50,7 @@ func LoadConfig() (*Config, error) {
 	}
 
 	if cfg.EtherfuseAPIKey == "" {
-		return nil, fmt.Errorf("ETHERFUSE_API_KEY is required (set in .env or environment)")
+		return nil, errors.New("ETHERFUSE_API_KEY is required (set in .env or environment)")
 	}
 
 	return cfg, nil
@@ -63,7 +63,7 @@ func loadDotEnv(path string) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
@@ -79,7 +79,7 @@ func loadDotEnv(path string) {
 		value = strings.TrimSpace(value)
 		// Only set if not already in environment
 		if os.Getenv(key) == "" {
-			os.Setenv(key, value)
+			_ = os.Setenv(key, value)
 		}
 	}
 }

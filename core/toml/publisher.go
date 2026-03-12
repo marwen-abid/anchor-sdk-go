@@ -71,6 +71,6 @@ func (p *Publisher) Handler() http.HandlerFunc {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(p.Render()))
+		_, _ = w.Write([]byte(p.Render()))
 	}
 }

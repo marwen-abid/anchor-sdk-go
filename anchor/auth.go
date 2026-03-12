@@ -45,7 +45,7 @@ type AuthIssuer struct {
 	accountFetcher    anchorsdk.AccountFetcher
 }
 
-func NewAuthIssuer(config AuthConfig) (*AuthIssuer, error) {
+func NewAuthIssuer(config AuthConfig) (*AuthIssuer, error) { //nolint:gocritic // hugeParam: AuthConfig is large but value semantics are intentional for config types
 	if strings.TrimSpace(config.Domain) == "" {
 		return nil, errors.NewAnchorError(errors.CONFIG_INVALID, "domain is required", nil)
 	}
@@ -91,7 +91,8 @@ func (a *AuthIssuer) CreateChallenge(ctx context.Context, account string) (strin
 	}
 
 	expiresAt := time.Now().Add(challengeTimeout)
-	if err := a.nonceStore.Add(ctx, nonce, expiresAt); err != nil {
+	err = a.nonceStore.Add(ctx, nonce, expiresAt)
+	if err != nil {
 		return "", errors.NewAnchorError(errors.CHALLENGE_BUILD_FAILED, "failed to store nonce", err)
 	}
 
@@ -178,7 +179,8 @@ func (a *AuthIssuer) VerifyChallenge(ctx context.Context, challengeXDR string) (
 	if strings.TrimSpace(account) == "" {
 		return "", errors.NewAnchorError(errors.CHALLENGE_VERIFY_FAILED, "first operation missing source account (client account)", nil)
 	}
-	if err := verifyChallengeSignatures(ctx, tx, a.networkPassphrase, a.signer.PublicKey(), account, a.accountFetcher); err != nil {
+	err = verifyChallengeSignatures(ctx, tx, a.networkPassphrase, a.signer.PublicKey(), account, a.accountFetcher)
+	if err != nil {
 		return "", err
 	}
 
@@ -221,14 +223,14 @@ func (a *AuthIssuer) RequireAuth(next http.Handler) http.Handler {
 		if header == "" || !strings.HasPrefix(header, "Bearer ") {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusForbidden)
-			w.Write([]byte(`{"error":"missing bearer token"}`))
+			_, _ = w.Write([]byte(`{"error":"missing bearer token"}`))
 			return
 		}
 		token := strings.TrimSpace(strings.TrimPrefix(header, "Bearer "))
 		if token == "" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusForbidden)
-			w.Write([]byte(`{"error":"missing bearer token"}`))
+			_, _ = w.Write([]byte(`{"error":"missing bearer token"}`))
 			return
 		}
 
@@ -236,7 +238,7 @@ func (a *AuthIssuer) RequireAuth(next http.Handler) http.Handler {
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusForbidden)
-			w.Write([]byte(`{"error":"invalid token"}`))
+			_, _ = w.Write([]byte(`{"error":"invalid token"}`))
 			return
 		}
 
@@ -270,9 +272,9 @@ func verifyChallengeSignatures(ctx context.Context, tx *txnbuild.Transaction, ne
 		signers, thresholds, fetchErr := fetcher.FetchSigners(ctx, clientAccount)
 		if fetchErr != nil {
 			// Account not found (unfunded) — per SEP-10, fall back to master key only
-			kp, err := keypair.ParseAddress(clientAccount)
-			if err != nil {
-				return errors.NewAnchorError(errors.CHALLENGE_VERIFY_FAILED, "invalid account address", err)
+			kp, kpErr := keypair.ParseAddress(clientAccount)
+			if kpErr != nil {
+				return errors.NewAnchorError(errors.CHALLENGE_VERIFY_FAILED, "invalid account address", kpErr)
 			}
 			clientSigners = []clientSigner{{kp: kp, weight: 1}}
 			medThreshold = 0
@@ -280,8 +282,8 @@ func verifyChallengeSignatures(ctx context.Context, tx *txnbuild.Transaction, ne
 			medThreshold = int32(thresholds.Medium)
 			clientSigners = make([]clientSigner, 0, len(signers))
 			for _, s := range signers {
-				kp, err := keypair.ParseAddress(s.Key)
-				if err != nil {
+				kp, kpErr := keypair.ParseAddress(s.Key)
+				if kpErr != nil {
 					continue // skip invalid signer keys
 				}
 				clientSigners = append(clientSigners, clientSigner{kp: kp, weight: s.Weight})
@@ -289,9 +291,9 @@ func verifyChallengeSignatures(ctx context.Context, tx *txnbuild.Transaction, ne
 		}
 	} else {
 		// No fetcher — legacy behavior: master key only, threshold 0
-		kp, err := keypair.ParseAddress(clientAccount)
-		if err != nil {
-			return errors.NewAnchorError(errors.CHALLENGE_VERIFY_FAILED, "invalid account address", err)
+		kp, kpErr := keypair.ParseAddress(clientAccount)
+		if kpErr != nil {
+			return errors.NewAnchorError(errors.CHALLENGE_VERIFY_FAILED, "invalid account address", kpErr)
 		}
 		clientSigners = []clientSigner{{kp: kp, weight: 1}}
 		medThreshold = 0

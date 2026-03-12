@@ -2,6 +2,7 @@ package signers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/marwen-abid/anchor-sdk-go"
@@ -33,7 +34,7 @@ func (s *keypairSigner) PublicKey() string {
 // SignTransaction signs a Stellar transaction envelope (base64 XDR).
 // It parses the XDR, signs the transaction hash with the keypair, and returns
 // the signed envelope as base64 XDR.
-func (s *keypairSigner) SignTransaction(ctx context.Context, xdr string, networkPassphrase string) (string, error) {
+func (s *keypairSigner) SignTransaction(ctx context.Context, xdr, networkPassphrase string) (string, error) {
 	parsed, err := txnbuild.TransactionFromXDR(xdr)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse transaction XDR: %w", err)
@@ -41,7 +42,7 @@ func (s *keypairSigner) SignTransaction(ctx context.Context, xdr string, network
 
 	tx, ok := parsed.Transaction()
 	if !ok {
-		return "", fmt.Errorf("expected a Transaction, got a FeeBumpTransaction")
+		return "", errors.New("expected a Transaction, got a FeeBumpTransaction")
 	}
 
 	signedTx, err := tx.Sign(networkPassphrase, s.kp)

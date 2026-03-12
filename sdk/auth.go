@@ -54,7 +54,7 @@ func (c *Client) Login(ctx context.Context, account, homeDomain string, signer a
 	if err != nil {
 		return nil, errors.NewClientError(
 			errors.AUTH_UNSUPPORTED,
-			fmt.Sprintf("failed to resolve stellar.toml for %s", homeDomain),
+			"failed to resolve stellar.toml for "+homeDomain,
 			err,
 		)
 	}
@@ -73,11 +73,11 @@ func (c *Client) Login(ctx context.Context, account, homeDomain string, signer a
 	if err != nil {
 		return nil, errors.NewClientError(
 			errors.CHALLENGE_FETCH_FAILED,
-			fmt.Sprintf("failed to fetch challenge from %s", challengeURL),
+			"failed to fetch challenge from "+challengeURL,
 			err,
 		)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
@@ -94,7 +94,7 @@ func (c *Client) Login(ctx context.Context, account, homeDomain string, signer a
 		NetworkPassphrase string `json:"network_passphrase"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&challengeResp); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(&challengeResp); err != nil {
 		return nil, errors.NewClientError(
 			errors.CHALLENGE_INVALID,
 			"failed to decode challenge response JSON",
@@ -143,7 +143,7 @@ func (c *Client) Login(ctx context.Context, account, homeDomain string, signer a
 			err,
 		)
 	}
-	defer submitResp.Body.Close()
+	defer func() { _ = submitResp.Body.Close() }()
 
 	if submitResp.StatusCode != 200 {
 		body, _ := io.ReadAll(submitResp.Body)
@@ -187,7 +187,7 @@ func (c *Client) Login(ctx context.Context, account, homeDomain string, signer a
 //
 // The amount parameter is optional; pass empty string to let the user specify
 // the amount in the interactive flow.
-func (s *Session) Deposit(ctx context.Context, assetCode string, amount string) (*TransferProcess, error) {
+func (s *Session) Deposit(ctx context.Context, assetCode, amount string) (*TransferProcess, error) {
 	return s.initiateTransfer(ctx, "deposit", assetCode, amount)
 }
 
@@ -197,17 +197,17 @@ func (s *Session) Deposit(ctx context.Context, assetCode string, amount string) 
 //
 // The amount parameter is optional; pass empty string to let the user specify
 // the amount in the interactive flow.
-func (s *Session) Withdraw(ctx context.Context, assetCode string, amount string) (*TransferProcess, error) {
+func (s *Session) Withdraw(ctx context.Context, assetCode, amount string) (*TransferProcess, error) {
 	return s.initiateTransfer(ctx, "withdrawal", assetCode, amount)
 }
 
 // initiateTransfer is the common implementation for Deposit and Withdraw.
-func (s *Session) initiateTransfer(ctx context.Context, kind string, assetCode string, amount string) (*TransferProcess, error) {
+func (s *Session) initiateTransfer(ctx context.Context, kind, assetCode, amount string) (*TransferProcess, error) {
 	anchorInfo, err := s.client.tomlResolver.Resolve(ctx, s.HomeDomain)
 	if err != nil {
 		return nil, errors.NewClientError(
 			errors.AUTH_UNSUPPORTED,
-			fmt.Sprintf("failed to resolve stellar.toml for %s", s.HomeDomain),
+			"failed to resolve stellar.toml for "+s.HomeDomain,
 			err,
 		)
 	}
@@ -248,17 +248,17 @@ func (s *Session) initiateTransfer(ctx context.Context, kind string, assetCode s
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.JWT))
+	req.Header.Set("Authorization", "Bearer "+s.JWT)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, errors.NewClientError(
 			errors.TRANSFER_INIT_FAILED,
-			fmt.Sprintf("failed to initiate %s", kind),
+			"failed to initiate "+kind,
 			err,
 		)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)

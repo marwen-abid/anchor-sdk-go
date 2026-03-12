@@ -50,7 +50,7 @@ type jwtPayload struct {
 }
 
 // Issue creates a JWT token with the given claims.
-func (j *hmacJWT) Issue(ctx context.Context, claims anchorsdk.JWTClaims) (string, error) {
+func (j *hmacJWT) Issue(ctx context.Context, claims anchorsdk.JWTClaims) (string, error) { //nolint:gocritic // hugeParam: JWTClaims matches the JWTIssuer interface signature
 	// Build header
 	header := jwtHeader{
 		Alg: "HS256",

@@ -57,10 +57,10 @@ func WithCursorSaver(saver func(string) error) ObserverOption {
 
 // WithReconnectBackoff sets the initial and maximum backoff durations for reconnection.
 // Default is 1s initial, 60s max with exponential growth.
-func WithReconnectBackoff(initial, max time.Duration) ObserverOption {
+func WithReconnectBackoff(initial, maxDur time.Duration) ObserverOption {
 	return func(h *HorizonObserver) {
 		h.initialBackoff = initial
-		h.maxBackoff = max
+		h.maxBackoff = maxDur
 	}
 }
 
@@ -201,7 +201,7 @@ func (h *HorizonObserver) Start(ctx context.Context) error {
 
 		// Increase backoff exponentially: 1s, 2s, 4s, 8s, ..., max 60s
 		attempt++
-		backoff = backoff * 2
+		backoff *= 2
 		if backoff > h.maxBackoff {
 			backoff = h.maxBackoff
 		}
@@ -220,13 +220,13 @@ func (h *HorizonObserver) Stop() error {
 // Returns nil if the operation is not a payment type.
 func (h *HorizonObserver) convertToPaymentEvent(op operations.Operation) *PaymentEvent {
 	// Get base operation data
-	base := op.GetBase()
+	baseOp := op.GetBase()
 
 	// Build base event
 	evt := &PaymentEvent{
-		ID:              base.ID,
-		Cursor:          base.PT, // PT is the paging_token field
-		TransactionHash: base.TransactionHash,
+		ID:              baseOp.ID,
+		Cursor:          baseOp.PT, // PT is the paging_token field
+		TransactionHash: baseOp.TransactionHash,
 	}
 
 	// Type-specific conversion
@@ -257,7 +257,7 @@ func (h *HorizonObserver) convertToPaymentEvent(op operations.Operation) *Paymen
 		// Path payments
 		// Note: The actual type might vary, we'll handle the base case
 		// For v1, we'll extract what we can from the base operation
-		evt.From = base.SourceAccount
+		evt.From = baseOp.SourceAccount
 		// Path payments are complex - for v1 we'll just capture what we can
 		// Production implementation would need to handle PathPayment types specifically
 		return nil // Skip path payments for v1 simplicity
@@ -292,7 +292,7 @@ func (h *HorizonObserver) formatAsset(asset base.Asset) string {
 }
 
 // processEvent runs all registered handlers for the given event if it passes their filters.
-func (h *HorizonObserver) processEvent(evt PaymentEvent) {
+func (h *HorizonObserver) processEvent(evt PaymentEvent) { //nolint:gocritic
 	h.mu.RLock()
 	handlers := h.handlers
 	h.mu.RUnlock()

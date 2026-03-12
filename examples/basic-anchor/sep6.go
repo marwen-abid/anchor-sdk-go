@@ -70,7 +70,7 @@ func handleSEP6Info() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }
 
@@ -86,16 +86,10 @@ func handleSEP6Deposit(tm *anchor.TransferManager) http.HandlerFunc {
 
 		// Parse query parameters
 		assetCode := r.URL.Query().Get("asset_code")
-		account := r.URL.Query().Get("account")
 		amount := r.URL.Query().Get("amount")
 
 		// Use account from JWT claims for security
-		if strings.TrimSpace(account) == "" {
-			account = claims.Subject
-		} else {
-			// Override with claims to prevent impersonation
-			account = claims.Subject
-		}
+		account := claims.Subject
 
 		if strings.TrimSpace(assetCode) == "" {
 			http.Error(w, `{"error":"asset_code is required"}`, http.StatusBadRequest)
@@ -134,7 +128,7 @@ func handleSEP6Deposit(tm *anchor.TransferManager) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }
 
@@ -150,17 +144,11 @@ func handleSEP6Withdraw(tm *anchor.TransferManager) http.HandlerFunc {
 
 		// Parse query parameters
 		assetCode := r.URL.Query().Get("asset_code")
-		account := r.URL.Query().Get("account")
 		amount := r.URL.Query().Get("amount")
 		dest := r.URL.Query().Get("dest")
 
 		// Use account from JWT claims for security
-		if strings.TrimSpace(account) == "" {
-			account = claims.Subject
-		} else {
-			// Override with claims to prevent impersonation
-			account = claims.Subject
-		}
+		account := claims.Subject
 
 		if strings.TrimSpace(assetCode) == "" {
 			http.Error(w, `{"error":"asset_code is required"}`, http.StatusBadRequest)
@@ -196,7 +184,7 @@ func handleSEP6Withdraw(tm *anchor.TransferManager) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }
 
@@ -224,7 +212,7 @@ func handleSEP6Transaction(tm *anchor.TransferManager) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(status)
+		_ = json.NewEncoder(w).Encode(status)
 	}
 }
 
@@ -279,6 +267,6 @@ func handleSEP6Transactions(store anchorsdk.TransferStore, baseURL string) http.
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }

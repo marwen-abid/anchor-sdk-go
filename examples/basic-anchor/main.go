@@ -99,7 +99,7 @@ func main() {
 		Domain:              testDomain,
 		InteractiveBaseURL:  fmt.Sprintf("http://%s/interactive", testDomain),
 		DistributionAccount: signer.PublicKey(),
-		BaseURL:             fmt.Sprintf("http://%s", testDomain),
+		BaseURL:             "http://" + testDomain,
 	}
 	transferManager := anchor.NewTransferManager(transferStore, transferConfig, nil)
 
@@ -151,18 +151,18 @@ func main() {
 	mux.HandleFunc("GET /auth", handleGetChallenge(authIssuer))
 	mux.HandleFunc("POST /auth", handlePostChallenge(authIssuer))
 	mux.HandleFunc("GET /sep24/info", handleSEP24Info())
-	mux.Handle("POST /sep24/transactions/deposit/interactive", authIssuer.RequireAuth(http.HandlerFunc(handleDepositInteractive(transferManager))))
-	mux.Handle("POST /sep24/transactions/withdraw/interactive", authIssuer.RequireAuth(http.HandlerFunc(handleWithdrawInteractive(transferManager))))
-	mux.Handle("GET /sep24/transaction", authIssuer.RequireAuth(http.HandlerFunc(handleGetTransaction(transferManager))))
-	mux.Handle("GET /sep24/transactions", authIssuer.RequireAuth(http.HandlerFunc(handleGetTransactions(transferStore, transferConfig.BaseURL))))
+	mux.Handle("POST /sep24/transactions/deposit/interactive", authIssuer.RequireAuth(handleDepositInteractive(transferManager)))
+	mux.Handle("POST /sep24/transactions/withdraw/interactive", authIssuer.RequireAuth(handleWithdrawInteractive(transferManager)))
+	mux.Handle("GET /sep24/transaction", authIssuer.RequireAuth(handleGetTransaction(transferManager)))
+	mux.Handle("GET /sep24/transactions", authIssuer.RequireAuth(handleGetTransactions(transferStore, transferConfig.BaseURL)))
 	mux.HandleFunc("GET /transaction/{id}", handleMoreInfo(transferManager))
 	mux.HandleFunc("GET /interactive", handleGetInteractive(transferManager))
 	mux.HandleFunc("POST /interactive", handlePostInteractive(transferManager))
 	mux.HandleFunc("GET /sep6/info", handleSEP6Info())
-	mux.Handle("GET /sep6/deposit", authIssuer.RequireAuth(http.HandlerFunc(handleSEP6Deposit(transferManager))))
-	mux.Handle("GET /sep6/withdraw", authIssuer.RequireAuth(http.HandlerFunc(handleSEP6Withdraw(transferManager))))
-	mux.Handle("GET /sep6/transaction", authIssuer.RequireAuth(http.HandlerFunc(handleSEP6Transaction(transferManager))))
-	mux.Handle("GET /sep6/transactions", authIssuer.RequireAuth(http.HandlerFunc(handleSEP6Transactions(transferStore, transferConfig.BaseURL))))
+	mux.Handle("GET /sep6/deposit", authIssuer.RequireAuth(handleSEP6Deposit(transferManager)))
+	mux.Handle("GET /sep6/withdraw", authIssuer.RequireAuth(handleSEP6Withdraw(transferManager)))
+	mux.Handle("GET /sep6/transaction", authIssuer.RequireAuth(handleSEP6Transaction(transferManager)))
+	mux.Handle("GET /sep6/transactions", authIssuer.RequireAuth(handleSEP6Transactions(transferStore, transferConfig.BaseURL)))
 
 	handler := corsMiddleware(mux)
 
@@ -196,20 +196,20 @@ func corsMiddleware(next http.Handler) http.Handler {
 func writeJSONError(w http.ResponseWriter, message string, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
 
 // handleGetChallenge returns a SEP-10 challenge transaction for the given account.
 func handleGetChallenge(authIssuer *anchor.AuthIssuer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		account := r.URL.Query().Get("account")
-		if account == "" {
+		acct := r.URL.Query().Get("account")
+		if acct == "" {
 			writeJSONError(w, "missing account parameter", http.StatusBadRequest)
 			return
 		}
 
 		ctx := context.Background()
-		challengeXDR, err := authIssuer.CreateChallenge(ctx, account)
+		challengeXDR, err := authIssuer.CreateChallenge(ctx, acct)
 		if err != nil {
 			log.Printf("Failed to create challenge: %v", err)
 			writeJSONError(w, "failed to create challenge", http.StatusBadRequest)
@@ -223,7 +223,7 @@ func handleGetChallenge(authIssuer *anchor.AuthIssuer) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }
 
@@ -245,7 +245,7 @@ func handlePostChallenge(authIssuer *anchor.AuthIssuer) http.HandlerFunc {
 				writeJSONError(w, "failed to read request body", http.StatusBadRequest)
 				return
 			}
-			defer r.Body.Close()
+			defer func() { _ = r.Body.Close() }()
 
 			var req authRequest
 			if err := json.Unmarshal(body, &req); err != nil {
@@ -274,6 +274,6 @@ func handlePostChallenge(authIssuer *anchor.AuthIssuer) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }

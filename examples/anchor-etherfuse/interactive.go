@@ -147,7 +147,7 @@ func handlePostOnboard(
 
 		// Return JSON with the onboarding URL (JS will open it)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
+		_ = json.NewEncoder(w).Encode(map[string]string{
 			"onboarding_url": url,
 		})
 	}
@@ -175,12 +175,12 @@ func handleKYCPoll(
 		kycStatus, err := ef.GetKYCStatus(r.Context(), customerID, transfer.Account)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]string{"status": "not_started"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "not_started"})
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": kycStatus.Status})
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": kycStatus.Status})
 	}
 }
 
@@ -206,7 +206,8 @@ func handlePostQuote(
 			return
 		}
 
-		if err := r.ParseForm(); err != nil {
+		err = r.ParseForm()
+		if err != nil {
 			writeJSONError(w, "invalid form data", http.StatusBadRequest)
 			return
 		}
@@ -326,7 +327,7 @@ func handlePostOrder(
 			return
 		}
 
-		if err := r.ParseForm(); err != nil {
+		if err = r.ParseForm(); err != nil {
 			writeJSONError(w, "invalid form data", http.StatusBadRequest)
 			return
 		}

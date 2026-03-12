@@ -85,10 +85,10 @@ func main() {
 	}
 
 	transferStore := memory.NewTransferStore()
-	baseURL := fmt.Sprintf("http://%s", cfg.AnchorDomain)
+	baseURL := "http://" + cfg.AnchorDomain
 	transferConfig := anchor.Config{
 		Domain:              cfg.AnchorDomain,
-		InteractiveBaseURL:  fmt.Sprintf("%s/interactive", baseURL),
+		InteractiveBaseURL:  baseURL + "/interactive",
 		DistributionAccount: signer.PublicKey(),
 		BaseURL:             baseURL,
 	}
@@ -104,8 +104,8 @@ func main() {
 	if err != nil {
 		log.Printf("WARNING: Failed to fetch Etherfuse assets: %v", err)
 		log.Printf("WARNING: Falling back to configured issuers")
-		assetIdentifiers["USDC"] = fmt.Sprintf("USDC:%s", cfg.USDCIssuer)
-		assetIdentifiers["CETES"] = fmt.Sprintf("CETES:%s", cfg.CETESIssuer)
+		assetIdentifiers["USDC"] = "USDC:" + cfg.USDCIssuer
+		assetIdentifiers["CETES"] = "CETES:" + cfg.CETESIssuer
 	} else {
 		for _, a := range efAssets {
 			assetIdentifiers[a.Symbol] = a.Identifier
@@ -162,8 +162,8 @@ func main() {
 	anchorInfo := &toml.AnchorInfo{
 		NetworkPassphrase:   cfg.NetworkPassphrase,
 		SigningKey:          signer.PublicKey(),
-		WebAuthEndpoint:     fmt.Sprintf("%s/auth", baseURL),
-		TransferServerSep24: fmt.Sprintf("%s/sep24", baseURL),
+		WebAuthEndpoint:     baseURL + "/auth",
+		TransferServerSep24: baseURL + "/sep24",
 		Currencies:          currencies,
 	}
 	tomlPublisher := toml.NewPublisher(anchorInfo)
@@ -193,12 +193,12 @@ func main() {
 	mux.HandleFunc("GET /sep24/info", handleSEP24Info())
 
 	// SEP-24: Interactive deposit/withdrawal
-	mux.Handle("POST /sep24/transactions/deposit/interactive", authIssuer.RequireAuth(http.HandlerFunc(handleDepositInteractive(transferManager))))
-	mux.Handle("POST /sep24/transactions/withdraw/interactive", authIssuer.RequireAuth(http.HandlerFunc(handleWithdrawInteractive(transferManager))))
+	mux.Handle("POST /sep24/transactions/deposit/interactive", authIssuer.RequireAuth(handleDepositInteractive(transferManager)))
+	mux.Handle("POST /sep24/transactions/withdraw/interactive", authIssuer.RequireAuth(handleWithdrawInteractive(transferManager)))
 
 	// SEP-24: Transaction status
-	mux.Handle("GET /sep24/transaction", authIssuer.RequireAuth(http.HandlerFunc(handleGetTransaction(transferManager, transferStore, baseURL))))
-	mux.Handle("GET /sep24/transactions", authIssuer.RequireAuth(http.HandlerFunc(handleGetTransactions(transferStore, baseURL))))
+	mux.Handle("GET /sep24/transaction", authIssuer.RequireAuth(handleGetTransaction(transferManager, transferStore, baseURL)))
+	mux.Handle("GET /sep24/transactions", authIssuer.RequireAuth(handleGetTransactions(transferStore, baseURL)))
 	mux.HandleFunc("GET /transaction/{id}", handleMoreInfo(transferStore))
 
 	// Interactive flow (multi-step Etherfuse KYC + quote + order)
@@ -246,7 +246,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 func writeJSONError(w http.ResponseWriter, message string, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
 
 // handleGetChallenge returns a SEP-10 challenge transaction for the given account.
@@ -272,7 +272,7 @@ func handleGetChallenge(authIssuer *anchor.AuthIssuer, networkPassphrase string)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }
 
@@ -294,7 +294,7 @@ func handlePostChallenge(authIssuer *anchor.AuthIssuer) http.HandlerFunc {
 				writeJSONError(w, "failed to read request body", http.StatusBadRequest)
 				return
 			}
-			defer r.Body.Close()
+			defer func() { _ = r.Body.Close() }()
 
 			var req authRequest
 			if err := json.Unmarshal(body, &req); err != nil {
@@ -318,6 +318,6 @@ func handlePostChallenge(authIssuer *anchor.AuthIssuer) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(authResponse{Token: token})
+		_ = json.NewEncoder(w).Encode(authResponse{Token: token})
 	}
 }

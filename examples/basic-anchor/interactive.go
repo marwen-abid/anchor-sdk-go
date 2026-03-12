@@ -72,7 +72,7 @@ func handlePostInteractive(tm *anchor.TransferManager) http.HandlerFunc {
 			log.Printf("Failed to parse form: %v", err)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(errorResponse{Error: "invalid form data"})
+			_ = json.NewEncoder(w).Encode(errorResponse{Error: "invalid form data"})
 			return
 		}
 
@@ -84,7 +84,7 @@ func handlePostInteractive(tm *anchor.TransferManager) http.HandlerFunc {
 		if token == "" || name == "" || email == "" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(errorResponse{Error: "missing required fields"})
+			_ = json.NewEncoder(w).Encode(errorResponse{Error: "missing required fields"})
 			return
 		}
 
@@ -94,7 +94,7 @@ func handlePostInteractive(tm *anchor.TransferManager) http.HandlerFunc {
 			log.Printf("Invalid token on POST: %v", err)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(errorResponse{Error: "invalid token"})
+			_ = json.NewEncoder(w).Encode(errorResponse{Error: "invalid token"})
 			return
 		}
 
@@ -108,13 +108,13 @@ func handlePostInteractive(tm *anchor.TransferManager) http.HandlerFunc {
 			log.Printf("Failed to complete interactive: %v", err)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(errorResponse{Error: "failed to process transfer"})
+			_ = json.NewEncoder(w).Encode(errorResponse{Error: "failed to process transfer"})
 			return
 		}
 
 		// Return success response
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(successData{Message: "Transfer initiated successfully"})
+		_ = json.NewEncoder(w).Encode(successData{Message: "Transfer initiated successfully"})
 	}
 }

@@ -47,7 +47,7 @@ func (t *TransferProcess) OnInteractive(handler func(string)) {
 func (t *TransferProcess) Poll(ctx context.Context) error {
 	url := fmt.Sprintf("%s/transaction?id=%s", t.endpoint, t.ID)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return errors.NewClientError(
 			errors.TRANSFER_STATUS_POLL_FAILED,
@@ -56,17 +56,17 @@ func (t *TransferProcess) Poll(ctx context.Context) error {
 		)
 	}
 
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", t.session.JWT))
+	req.Header.Set("Authorization", "Bearer "+t.session.JWT)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return errors.NewClientError(
 			errors.TRANSFER_STATUS_POLL_FAILED,
-			fmt.Sprintf("failed to poll transfer %s", t.ID),
+			"failed to poll transfer "+t.ID,
 			err,
 		)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)

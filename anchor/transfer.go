@@ -181,7 +181,7 @@ func (tm *TransferManager) InitiateDeposit(ctx context.Context, req DepositReque
 	return &DepositResult{ID: transfer.ID, Instructions: "deposit initiated", ETA: 0}, nil
 }
 
-func (tm *TransferManager) InitiateWithdrawal(ctx context.Context, req WithdrawalRequest) (*WithdrawalResult, error) {
+func (tm *TransferManager) InitiateWithdrawal(ctx context.Context, req WithdrawalRequest) (*WithdrawalResult, error) { //nolint:gocritic // hugeParam: WithdrawalRequest matches the public API contract
 	if tm.store == nil {
 		return nil, errors.NewAnchorError(errors.STORE_ERROR, "transfer store not configured", nil)
 	}
@@ -319,11 +319,11 @@ func (tm *TransferManager) NotifyDisbursementSent(ctx context.Context, transferI
 	return tm.updateAndTransition(ctx, transferID, update, anchorsdk.StatusCompleted, HookTransferStatusChanged)
 }
 
-func (tm *TransferManager) Deny(ctx context.Context, transferID string, reason string) error {
+func (tm *TransferManager) Deny(ctx context.Context, transferID, reason string) error {
 	return tm.transition(ctx, transferID, anchorsdk.StatusDenied, reason)
 }
 
-func (tm *TransferManager) Cancel(ctx context.Context, transferID string, reason string) error {
+func (tm *TransferManager) Cancel(ctx context.Context, transferID, reason string) error {
 	return tm.transition(ctx, transferID, anchorsdk.StatusCancelled, reason)
 }
 
@@ -351,9 +351,10 @@ func (tm *TransferManager) GetStatus(ctx context.Context, transferID string) (*T
 		Message:      transfer.Message,
 	}
 	// SEP-24: deposits require "to" (user's Stellar account), withdrawals require "from"
-	if transfer.Kind == anchorsdk.KindDeposit {
+	switch transfer.Kind {
+	case anchorsdk.KindDeposit:
 		resp.To = transfer.Account
-	} else if transfer.Kind == anchorsdk.KindWithdrawal {
+	case anchorsdk.KindWithdrawal:
 		resp.From = transfer.Account
 	}
 	return resp, nil
@@ -368,11 +369,12 @@ func (tm *TransferManager) updateAndTransition(ctx context.Context, transferID s
 	if err != nil {
 		return errors.NewAnchorError(errors.STORE_ERROR, "failed to load transfer", err)
 	}
-	if err := ValidateTransition(transfer.Status, next); err != nil {
+	err = ValidateTransition(transfer.Status, next)
+	if err != nil {
 		return err
 	}
 	update.Status = &next
-	if err := tm.store.Update(ctx, transferID, update); err != nil {
+	if err = tm.store.Update(ctx, transferID, update); err != nil {
 		return errors.NewAnchorError(errors.STORE_ERROR, "failed to update transfer", err)
 	}
 	updated, err := tm.store.FindByID(ctx, transferID)
@@ -392,7 +394,8 @@ func (tm *TransferManager) transition(ctx context.Context, transferID string, ne
 	if err != nil {
 		return errors.NewAnchorError(errors.STORE_ERROR, "failed to load transfer", err)
 	}
-	if err := ValidateTransition(transfer.Status, next); err != nil {
+	err = ValidateTransition(transfer.Status, next)
+	if err != nil {
 		return err
 	}
 	update := &anchorsdk.TransferUpdate{Status: &next}
@@ -403,7 +406,7 @@ func (tm *TransferManager) transition(ctx context.Context, transferID string, ne
 		completedAt := time.Now()
 		update.CompletedAt = &completedAt
 	}
-	if err := tm.store.Update(ctx, transferID, update); err != nil {
+	if err = tm.store.Update(ctx, transferID, update); err != nil {
 		return errors.NewAnchorError(errors.STORE_ERROR, "failed to update transfer", err)
 	}
 	updated, err := tm.store.FindByID(ctx, transferID)
@@ -413,8 +416,8 @@ func (tm *TransferManager) transition(ctx context.Context, transferID string, ne
 	return nil
 }
 
-func (tm *TransferManager) generateInteractiveURL(transferID string) (string, string, error) {
-	token, err := corecrypto.GenerateNonce(interactiveTokenLength)
+func (tm *TransferManager) generateInteractiveURL(transferID string) (token, interactiveURL string, err error) {
+	token, err = corecrypto.GenerateNonce(interactiveTokenLength)
 	if err != nil {
 		return "", "", errors.NewAnchorError(errors.INTERACTIVE_TOKEN_INVALID, "failed to generate interactive token", err)
 	}
@@ -429,19 +432,6 @@ func (tm *TransferManager) generateInteractiveURL(transferID string) (string, st
 		}
 		base = strings.TrimRight(baseURL, "/") + "/interactive"
 	}
-	url := fmt.Sprintf("%s?token=%s", base, token)
-	return token, url, nil
-}
-
-func isTerminal(status anchorsdk.TransferStatus) bool {
-	switch status {
-	case anchorsdk.StatusCompleted,
-		anchorsdk.StatusFailed,
-		anchorsdk.StatusDenied,
-		anchorsdk.StatusCancelled,
-		anchorsdk.StatusExpired:
-		return true
-	default:
-		return false
-	}
+	interactiveURL = fmt.Sprintf("%s?token=%s", base, token)
+	return token, interactiveURL, nil
 }

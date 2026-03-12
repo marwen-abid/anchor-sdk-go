@@ -121,9 +121,10 @@ func buildTransactionResponse(transfer *anchorsdk.Transfer, baseURL string) *eth
 		Message:      transfer.Message,
 	}
 
-	if transfer.Kind == anchorsdk.KindDeposit {
+	switch transfer.Kind {
+	case anchorsdk.KindDeposit:
 		resp.To = transfer.Account
-	} else if transfer.Kind == anchorsdk.KindWithdrawal {
+	case anchorsdk.KindWithdrawal:
 		resp.From = transfer.Account
 	}
 
@@ -171,7 +172,7 @@ func handleSEP24Info() http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }
 
@@ -201,7 +202,7 @@ func handleDepositInteractive(tm *anchor.TransferManager) http.HandlerFunc {
 		if strings.TrimSpace(account) == "" {
 			account = claims.Subject
 		}
-		if _, err := keypair.ParseAddress(account); err != nil {
+		if _, err = keypair.ParseAddress(account); err != nil {
 			writeJSONError(w, "invalid account", http.StatusBadRequest)
 			return
 		}
@@ -230,7 +231,7 @@ func handleDepositInteractive(tm *anchor.TransferManager) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }
 
@@ -286,7 +287,7 @@ func handleWithdrawInteractive(tm *anchor.TransferManager) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }
 
@@ -313,19 +314,19 @@ func handleGetTransaction(tm *anchor.TransferManager, store anchorsdk.TransferSt
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusNotFound)
-				json.NewEncoder(w).Encode(map[string]string{"error": "transfer not found"})
+				_ = json.NewEncoder(w).Encode(map[string]string{"error": "transfer not found"})
 				return
 			}
 			resp := buildTransactionResponse(transfer, baseURL)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(sep24TransactionResponse{Transaction: resp})
+			_ = json.NewEncoder(w).Encode(sep24TransactionResponse{Transaction: resp})
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "transfer not found"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "transfer not found"})
 	}
 }
 
@@ -352,10 +353,11 @@ func handleGetTransactions(store anchorsdk.TransferStore, baseURL string) http.H
 		if strings.TrimSpace(assetCode) != "" {
 			filters.AssetCode = assetCode
 		}
-		if kind == "deposit" {
+		switch kind {
+		case "deposit":
 			k := anchorsdk.KindDeposit
 			filters.Kind = &k
-		} else if kind == "withdrawal" {
+		case "withdrawal":
 			k := anchorsdk.KindWithdrawal
 			filters.Kind = &k
 		}
@@ -395,7 +397,7 @@ func handleGetTransactions(store anchorsdk.TransferStore, baseURL string) http.H
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(sep24TransactionsResponse{Transactions: responses})
+		_ = json.NewEncoder(w).Encode(sep24TransactionsResponse{Transactions: responses})
 	}
 }
 
@@ -425,7 +427,7 @@ func handleMoreInfo(store anchorsdk.TransferStore) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `<html><head><style>
+		_, _ = fmt.Fprintf(w, `<html><head><style>
 body{font-family:system-ui,sans-serif;max-width:520px;margin:40px auto;padding:0 16px;background:#f5f5f5;color:#1a1a1a}
 .card{background:#fff;border-radius:12px;padding:28px;box-shadow:0 2px 12px rgba(0,0,0,0.08)}
 h1{font-size:20px;margin-bottom:16px}
