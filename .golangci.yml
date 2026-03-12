@@ -1,0 +1,51 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - gocritic
+    - gosec
+    - misspell
+    - unconvert
+    - unparam
+    - errname
+    - predeclared
+    - copyloopvar
+    - intrange
+    - perfsprint
+
+  settings:
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+
+    gosec:
+      excludes:
+        - G101
+
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+
+  exclusions:
+    rules:
+      - path: examples/
+        linters:
+          - gosec
+          - unparam
+
+formatters:
+  enable:
+    - gofumpt
+
+  settings:
+    gofumpt:
+      extra-rules: true
+
+issues:
+  exclude-dirs:
+    - .idea
+    - .sisyphus
