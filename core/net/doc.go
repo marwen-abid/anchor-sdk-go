@@ -1,2 +1,2 @@
-// Package net provides HTTP client utilities for the Stellar Connect SDK.
+// Package net provides HTTP client utilities for the Stellar Anchor SDK.
 package net

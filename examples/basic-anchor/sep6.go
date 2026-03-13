@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	stellarconnect "github.com/marwen-abid/anchor-sdk-go"
+	anchorsdk "github.com/marwen-abid/anchor-sdk-go"
 	"github.com/marwen-abid/anchor-sdk-go/anchor"
 )
 
@@ -70,7 +70,7 @@ func handleSEP6Info() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }
 
@@ -86,16 +86,10 @@ func handleSEP6Deposit(tm *anchor.TransferManager) http.HandlerFunc {
 
 		// Parse query parameters
 		assetCode := r.URL.Query().Get("asset_code")
-		account := r.URL.Query().Get("account")
 		amount := r.URL.Query().Get("amount")
 
 		// Use account from JWT claims for security
-		if strings.TrimSpace(account) == "" {
-			account = claims.Subject
-		} else {
-			// Override with claims to prevent impersonation
-			account = claims.Subject
-		}
+		account := claims.Subject
 
 		if strings.TrimSpace(assetCode) == "" {
 			http.Error(w, `{"error":"asset_code is required"}`, http.StatusBadRequest)
@@ -111,7 +105,7 @@ func handleSEP6Deposit(tm *anchor.TransferManager) http.HandlerFunc {
 			Account:   account,
 			AssetCode: assetCode,
 			Amount:    amount,
-			Mode:      stellarconnect.ModeAPI,
+			Mode:      anchorsdk.ModeAPI,
 		}
 
 		result, err := tm.InitiateDeposit(context.Background(), req)
@@ -134,7 +128,7 @@ func handleSEP6Deposit(tm *anchor.TransferManager) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }
 
@@ -150,17 +144,11 @@ func handleSEP6Withdraw(tm *anchor.TransferManager) http.HandlerFunc {
 
 		// Parse query parameters
 		assetCode := r.URL.Query().Get("asset_code")
-		account := r.URL.Query().Get("account")
 		amount := r.URL.Query().Get("amount")
 		dest := r.URL.Query().Get("dest")
 
 		// Use account from JWT claims for security
-		if strings.TrimSpace(account) == "" {
-			account = claims.Subject
-		} else {
-			// Override with claims to prevent impersonation
-			account = claims.Subject
-		}
+		account := claims.Subject
 
 		if strings.TrimSpace(assetCode) == "" {
 			http.Error(w, `{"error":"asset_code is required"}`, http.StatusBadRequest)
@@ -177,7 +165,7 @@ func handleSEP6Withdraw(tm *anchor.TransferManager) http.HandlerFunc {
 			AssetCode: assetCode,
 			Amount:    amount,
 			Dest:      dest,
-			Mode:      stellarconnect.ModeAPI,
+			Mode:      anchorsdk.ModeAPI,
 		}
 
 		result, err := tm.InitiateWithdrawal(context.Background(), req)
@@ -196,7 +184,7 @@ func handleSEP6Withdraw(tm *anchor.TransferManager) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }
 
@@ -224,13 +212,13 @@ func handleSEP6Transaction(tm *anchor.TransferManager) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(status)
+		_ = json.NewEncoder(w).Encode(status)
 	}
 }
 
 // handleSEP6Transactions returns a list of transfers for the authenticated account.
 // Requires JWT authentication. Supports optional asset_code filter.
-func handleSEP6Transactions(store stellarconnect.TransferStore, baseURL string) http.HandlerFunc {
+func handleSEP6Transactions(store anchorsdk.TransferStore, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := anchor.ClaimsFromContext(r.Context())
 		if !ok {
@@ -240,7 +228,7 @@ func handleSEP6Transactions(store stellarconnect.TransferStore, baseURL string) 
 
 		assetCode := r.URL.Query().Get("asset_code")
 
-		filters := stellarconnect.TransferFilters{
+		filters := anchorsdk.TransferFilters{
 			Account: claims.Subject,
 		}
 		if strings.TrimSpace(assetCode) != "" {
@@ -279,6 +267,6 @@ func handleSEP6Transactions(store stellarconnect.TransferStore, baseURL string) 
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }

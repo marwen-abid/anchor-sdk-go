@@ -10,27 +10,27 @@ import (
 	"sync"
 	"time"
 
-	stellarconnect "github.com/marwen-abid/anchor-sdk-go"
+	anchorsdk "github.com/marwen-abid/anchor-sdk-go"
 )
 
-// TransferStore is an in-memory implementation of stellarconnect.TransferStore.
+// TransferStore is an in-memory implementation of anchorsdk.TransferStore.
 // It stores transfers in a map with thread-safe access via sync.RWMutex.
 // All transfers are keyed by their ID field.
 type TransferStore struct {
-	transfers map[string]*stellarconnect.Transfer
+	transfers map[string]*anchorsdk.Transfer
 	mu        sync.RWMutex
 }
 
 // NewTransferStore creates a new in-memory transfer store.
 func NewTransferStore() *TransferStore {
 	return &TransferStore{
-		transfers: make(map[string]*stellarconnect.Transfer),
+		transfers: make(map[string]*anchorsdk.Transfer),
 	}
 }
 
 // Save persists a new transfer record.
 // Returns an error if a transfer with the same ID already exists.
-func (s *TransferStore) Save(ctx context.Context, transfer *stellarconnect.Transfer) error {
+func (s *TransferStore) Save(ctx context.Context, transfer *anchorsdk.Transfer) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -44,7 +44,7 @@ func (s *TransferStore) Save(ctx context.Context, transfer *stellarconnect.Trans
 
 // FindByID retrieves a transfer by its unique identifier.
 // Returns an error if the transfer is not found.
-func (s *TransferStore) FindByID(ctx context.Context, id string) (*stellarconnect.Transfer, error) {
+func (s *TransferStore) FindByID(ctx context.Context, id string) (*anchorsdk.Transfer, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -58,11 +58,11 @@ func (s *TransferStore) FindByID(ctx context.Context, id string) (*stellarconnec
 
 // FindByAccount returns all transfers for a given Stellar account.
 // Returns a slice of matching transfers (or empty slice if none found).
-func (s *TransferStore) FindByAccount(ctx context.Context, account string) ([]*stellarconnect.Transfer, error) {
+func (s *TransferStore) FindByAccount(ctx context.Context, account string) ([]*anchorsdk.Transfer, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	var result []*stellarconnect.Transfer
+	var result []*anchorsdk.Transfer
 	for _, transfer := range s.transfers {
 		if transfer.Account == account {
 			result = append(result, transfer)
@@ -75,7 +75,7 @@ func (s *TransferStore) FindByAccount(ctx context.Context, account string) ([]*s
 // Update applies partial updates to an existing transfer.
 // Only non-nil fields in the update are applied.
 // Returns an error if the transfer does not exist.
-func (s *TransferStore) Update(ctx context.Context, id string, update *stellarconnect.TransferUpdate) error {
+func (s *TransferStore) Update(ctx context.Context, id string, update *anchorsdk.TransferUpdate) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -122,11 +122,11 @@ func (s *TransferStore) Update(ctx context.Context, id string, update *stellarco
 // List returns transfers matching the given filters.
 // Filters by account, asset code, status, and kind fields.
 // Returns a slice of matching transfers (or empty slice if none found).
-func (s *TransferStore) List(ctx context.Context, filters stellarconnect.TransferFilters) ([]*stellarconnect.Transfer, error) {
+func (s *TransferStore) List(ctx context.Context, filters anchorsdk.TransferFilters) ([]*anchorsdk.Transfer, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	var result []*stellarconnect.Transfer
+	var result []*anchorsdk.Transfer
 
 	for _, transfer := range s.transfers {
 		// Apply filters
@@ -149,5 +149,5 @@ func (s *TransferStore) List(ctx context.Context, filters stellarconnect.Transfe
 	return result, nil
 }
 
-// Verify that TransferStore implements stellarconnect.TransferStore
-var _ stellarconnect.TransferStore = (*TransferStore)(nil)
+// Verify that TransferStore implements anchorsdk.TransferStore
+var _ anchorsdk.TransferStore = (*TransferStore)(nil)

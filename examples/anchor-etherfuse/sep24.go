@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	stellarconnect "github.com/marwen-abid/anchor-sdk-go"
+	anchorsdk "github.com/marwen-abid/anchor-sdk-go"
 	"github.com/marwen-abid/anchor-sdk-go/anchor"
-	"github.com/stellar/go/keypair"
+	"github.com/stellar/go-stellar-sdk/keypair"
 )
 
 // supportedAssets is the set of asset codes supported by this anchor.
@@ -80,12 +80,12 @@ type etherfuseTransactionResponse struct {
 // mapStatusToSEP24 maps internal SDK statuses to SEP-24 spec statuses.
 // For Etherfuse withdrawals in pending_external with withdraw details available,
 // it returns pending_user_transfer_start so wallets prompt the user to send payment.
-func mapStatusToSEP24(transfer *stellarconnect.Transfer) string {
+func mapStatusToSEP24(transfer *anchorsdk.Transfer) string {
 	status := string(transfer.Status)
 
 	// Etherfuse withdrawal: once withdraw details are available, present as
 	// pending_user_transfer_start so the wallet knows to prompt the user.
-	if transfer.Kind == stellarconnect.KindWithdrawal && status == "pending_external" {
+	if transfer.Kind == anchorsdk.KindWithdrawal && status == "pending_external" {
 		if transfer.Metadata != nil {
 			if _, ok := transfer.Metadata["etherfuse_withdraw_anchor_account"]; ok {
 				return "pending_user_transfer_start"
@@ -105,7 +105,7 @@ func mapStatusToSEP24(transfer *stellarconnect.Transfer) string {
 
 // buildTransactionResponse creates an etherfuseTransactionResponse from a
 // Transfer and its status response, enriching it with Etherfuse metadata.
-func buildTransactionResponse(transfer *stellarconnect.Transfer, baseURL string) *etherfuseTransactionResponse {
+func buildTransactionResponse(transfer *anchorsdk.Transfer, baseURL string) *etherfuseTransactionResponse {
 	moreInfo := strings.TrimRight(baseURL, "/") + "/transaction/" + transfer.ID
 	resp := &etherfuseTransactionResponse{
 		ID:           transfer.ID,
@@ -121,9 +121,10 @@ func buildTransactionResponse(transfer *stellarconnect.Transfer, baseURL string)
 		Message:      transfer.Message,
 	}
 
-	if transfer.Kind == stellarconnect.KindDeposit {
+	switch transfer.Kind {
+	case anchorsdk.KindDeposit:
 		resp.To = transfer.Account
-	} else if transfer.Kind == stellarconnect.KindWithdrawal {
+	case anchorsdk.KindWithdrawal:
 		resp.From = transfer.Account
 	}
 
@@ -171,7 +172,7 @@ func handleSEP24Info() http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }
 
@@ -201,7 +202,7 @@ func handleDepositInteractive(tm *anchor.TransferManager) http.HandlerFunc {
 		if strings.TrimSpace(account) == "" {
 			account = claims.Subject
 		}
-		if _, err := keypair.ParseAddress(account); err != nil {
+		if _, err = keypair.ParseAddress(account); err != nil {
 			writeJSONError(w, "invalid account", http.StatusBadRequest)
 			return
 		}
@@ -213,7 +214,7 @@ func handleDepositInteractive(tm *anchor.TransferManager) http.HandlerFunc {
 			Account:   account,
 			AssetCode: assetCode,
 			Amount:    amount,
-			Mode:      stellarconnect.ModeInteractive,
+			Mode:      anchorsdk.ModeInteractive,
 		}
 
 		result, err := tm.InitiateDeposit(context.Background(), req)
@@ -230,7 +231,7 @@ func handleDepositInteractive(tm *anchor.TransferManager) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }
 
@@ -269,7 +270,7 @@ func handleWithdrawInteractive(tm *anchor.TransferManager) http.HandlerFunc {
 			AssetCode: assetCode,
 			Amount:    amount,
 			Dest:      dest,
-			Mode:      stellarconnect.ModeInteractive,
+			Mode:      anchorsdk.ModeInteractive,
 		}
 
 		result, err := tm.InitiateWithdrawal(context.Background(), req)
@@ -286,12 +287,12 @@ func handleWithdrawInteractive(tm *anchor.TransferManager) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}
 }
 
 // handleGetTransaction returns the status of a single transfer.
-func handleGetTransaction(tm *anchor.TransferManager, store stellarconnect.TransferStore, baseURL string) http.HandlerFunc {
+func handleGetTransaction(tm *anchor.TransferManager, store anchorsdk.TransferStore, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, ok := anchor.ClaimsFromContext(r.Context())
 		if !ok {
@@ -313,24 +314,24 @@ func handleGetTransaction(tm *anchor.TransferManager, store stellarconnect.Trans
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusNotFound)
-				json.NewEncoder(w).Encode(map[string]string{"error": "transfer not found"})
+				_ = json.NewEncoder(w).Encode(map[string]string{"error": "transfer not found"})
 				return
 			}
 			resp := buildTransactionResponse(transfer, baseURL)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(sep24TransactionResponse{Transaction: resp})
+			_ = json.NewEncoder(w).Encode(sep24TransactionResponse{Transaction: resp})
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "transfer not found"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "transfer not found"})
 	}
 }
 
 // handleGetTransactions returns a list of transfers for the authenticated account.
-func handleGetTransactions(store stellarconnect.TransferStore, baseURL string) http.HandlerFunc {
+func handleGetTransactions(store anchorsdk.TransferStore, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := anchor.ClaimsFromContext(r.Context())
 		if !ok {
@@ -348,15 +349,16 @@ func handleGetTransactions(store stellarconnect.TransferStore, baseURL string) h
 			return
 		}
 
-		filters := stellarconnect.TransferFilters{Account: claims.Subject}
+		filters := anchorsdk.TransferFilters{Account: claims.Subject}
 		if strings.TrimSpace(assetCode) != "" {
 			filters.AssetCode = assetCode
 		}
-		if kind == "deposit" {
-			k := stellarconnect.KindDeposit
+		switch kind {
+		case "deposit":
+			k := anchorsdk.KindDeposit
 			filters.Kind = &k
-		} else if kind == "withdrawal" {
-			k := stellarconnect.KindWithdrawal
+		case "withdrawal":
+			k := anchorsdk.KindWithdrawal
 			filters.Kind = &k
 		}
 
@@ -368,7 +370,7 @@ func handleGetTransactions(store stellarconnect.TransferStore, baseURL string) h
 
 		if noOlderThan != "" {
 			if cutoff, err := time.Parse(time.RFC3339, noOlderThan); err == nil {
-				filtered := make([]*stellarconnect.Transfer, 0, len(transfers))
+				filtered := make([]*anchorsdk.Transfer, 0, len(transfers))
 				for _, t := range transfers {
 					if !t.CreatedAt.Before(cutoff) {
 						filtered = append(filtered, t)
@@ -395,12 +397,12 @@ func handleGetTransactions(store stellarconnect.TransferStore, baseURL string) h
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(sep24TransactionsResponse{Transactions: responses})
+		_ = json.NewEncoder(w).Encode(sep24TransactionsResponse{Transactions: responses})
 	}
 }
 
 // handleMoreInfo serves the more_info_url page for a transaction.
-func handleMoreInfo(store stellarconnect.TransferStore) http.HandlerFunc {
+func handleMoreInfo(store anchorsdk.TransferStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		if id == "" {
@@ -425,7 +427,7 @@ func handleMoreInfo(store stellarconnect.TransferStore) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `<html><head><style>
+		_, _ = fmt.Fprintf(w, `<html><head><style>
 body{font-family:system-ui,sans-serif;max-width:520px;margin:40px auto;padding:0 16px;background:#f5f5f5;color:#1a1a1a}
 .card{background:#fff;border-radius:12px;padding:28px;box-shadow:0 2px 12px rgba(0,0,0,0.08)}
 h1{font-size:20px;margin-bottom:16px}

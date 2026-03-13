@@ -1,2 +1,2 @@
-// Package core provides core utilities for the Stellar Connect SDK.
+// Package core provides core utilities for the Stellar Anchor SDK.
 package core

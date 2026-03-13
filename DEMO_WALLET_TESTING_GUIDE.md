@@ -2,7 +2,7 @@
 
 ## Summary
 
-The Stellar Connect Go SDK example anchor has been implemented with full SEP-1, SEP-10, and SEP-24 support. Manual testing with the Stellar Demo Wallet is required since the anchor runs on localhost (not publicly accessible).
+The Stellar Anchor Go SDK example anchor has been implemented with full SEP-1, SEP-10, and SEP-24 support. Manual testing with the Stellar Demo Wallet is required since the anchor runs on localhost (not publicly accessible).
 
 ## Implementation Status
 

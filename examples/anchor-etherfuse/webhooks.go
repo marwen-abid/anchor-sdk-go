@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -14,10 +15,10 @@ import (
 	"strings"
 	"time"
 
-	stellarconnect "github.com/marwen-abid/anchor-sdk-go"
+	anchorsdk "github.com/marwen-abid/anchor-sdk-go"
 	"github.com/marwen-abid/anchor-sdk-go/anchor"
-	"github.com/stellar/go/txnbuild"
-	"github.com/stellar/go/xdr"
+	"github.com/stellar/go-stellar-sdk/txnbuild"
+	"github.com/stellar/go-stellar-sdk/xdr"
 )
 
 // --- Webhook payload types (top-level key is event type) ---
@@ -66,7 +67,7 @@ type BankAccountUpdatedPayload struct {
 // transfer state transitions accordingly.
 func handleWebhook(
 	tm *anchor.TransferManager,
-	store stellarconnect.TransferStore,
+	store anchorsdk.TransferStore,
 	webhookSecret string,
 	networkPassphrase string,
 ) http.HandlerFunc {
@@ -76,7 +77,7 @@ func handleWebhook(
 			http.Error(w, "failed to read body", http.StatusBadRequest)
 			return
 		}
-		defer r.Body.Close()
+		defer func() { _ = r.Body.Close() }()
 
 		// Verify HMAC-SHA256 signature
 		sig := r.Header.Get("X-Signature")
@@ -117,7 +118,7 @@ func handleWebhook(
 	}
 }
 
-func handleOrderUpdated(ctx context.Context, tm *anchor.TransferManager, store stellarconnect.TransferStore, data json.RawMessage, networkPassphrase string) {
+func handleOrderUpdated(ctx context.Context, tm *anchor.TransferManager, store anchorsdk.TransferStore, data json.RawMessage, networkPassphrase string) {
 	var payload OrderUpdatedPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
 		log.Printf("Webhook: failed to parse order_updated: %v", err)
@@ -143,8 +144,8 @@ func handleOrderUpdated(ctx context.Context, tm *anchor.TransferManager, store s
 func applyOrderFields(
 	ctx context.Context,
 	tm *anchor.TransferManager,
-	store stellarconnect.TransferStore,
-	transfer *stellarconnect.Transfer,
+	store anchorsdk.TransferStore,
+	transfer *anchorsdk.Transfer,
 	networkPassphrase, orderID, orderType, status, burnTransaction, confirmedTxSignature string,
 	amountInTokens float64,
 	withdrawAnchorAccount, withdrawMemo, withdrawMemoType string,
@@ -287,7 +288,7 @@ var terminalStatuses = map[string]bool{
 // startOrderPoller starts a background goroutine that polls Etherfuse every
 // 10 seconds for the current state of all non-terminal transfers. This handles
 // the full order lifecycle when webhooks cannot reach localhost.
-func startOrderPoller(ef *EtherfuseClient, tm *anchor.TransferManager, store stellarconnect.TransferStore, networkPassphrase string) {
+func startOrderPoller(ef *EtherfuseClient, tm *anchor.TransferManager, store anchorsdk.TransferStore, networkPassphrase string) {
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
@@ -300,8 +301,8 @@ func startOrderPoller(ef *EtherfuseClient, tm *anchor.TransferManager, store ste
 
 // pollOrders iterates all non-terminal transfers with an etherfuse_order_id,
 // fetches the latest order state from Etherfuse, and applies any transitions.
-func pollOrders(ctx context.Context, ef *EtherfuseClient, tm *anchor.TransferManager, store stellarconnect.TransferStore, networkPassphrase string) {
-	transfers, err := store.List(ctx, stellarconnect.TransferFilters{})
+func pollOrders(ctx context.Context, ef *EtherfuseClient, tm *anchor.TransferManager, store anchorsdk.TransferStore, networkPassphrase string) {
+	transfers, err := store.List(ctx, anchorsdk.TransferFilters{})
 	if err != nil {
 		log.Printf("Poller: failed to list transfers: %v", err)
 		return
@@ -381,8 +382,8 @@ func verifyWebhookSignature(body []byte, signature, secret string) bool {
 
 // findTransferByOrderID scans all transfers for one whose Metadata contains
 // the given Etherfuse order ID. Returns nil if not found.
-func findTransferByOrderID(ctx context.Context, store stellarconnect.TransferStore, orderID string) (*stellarconnect.Transfer, error) {
-	transfers, err := store.List(ctx, stellarconnect.TransferFilters{})
+func findTransferByOrderID(ctx context.Context, store anchorsdk.TransferStore, orderID string) (*anchorsdk.Transfer, error) {
+	transfers, err := store.List(ctx, anchorsdk.TransferFilters{})
 	if err != nil {
 		return nil, err
 	}
@@ -400,7 +401,7 @@ func findTransferByOrderID(ctx context.Context, store stellarconnect.TransferSto
 // and extracts the destination account, memo, and memo type from the payment operation.
 // This is used to populate withdraw_anchor_account, withdraw_memo, and withdraw_memo_type
 // for SEP-24 withdrawal compliance (design doc section 6.6, Option A).
-func decodeBurnTransaction(xdrBase64 string, networkPassphrase string) (account string, memo string, memoType string, err error) {
+func decodeBurnTransaction(xdrBase64, networkPassphrase string) (account, memo, memoType string, err error) {
 	parsed, err := txnbuild.TransactionFromXDR(xdrBase64)
 	if err != nil {
 		return "", "", "", fmt.Errorf("parse XDR: %w", err)
@@ -410,7 +411,7 @@ func decodeBurnTransaction(xdrBase64 string, networkPassphrase string) (account 
 	if t, ok := parsed.Transaction(); ok {
 		tx = t
 	} else {
-		return "", "", "", fmt.Errorf("expected Transaction, got FeeBumpTransaction")
+		return "", "", "", errors.New("expected Transaction, got FeeBumpTransaction")
 	}
 
 	// Extract memo and memo type
@@ -419,7 +420,7 @@ func decodeBurnTransaction(xdrBase64 string, networkPassphrase string) (account 
 		if err == nil {
 			switch memoXDR.Type {
 			case xdr.MemoTypeMemoText:
-				memo = string(memoXDR.MustText())
+				memo = memoXDR.MustText()
 				memoType = "text"
 			case xdr.MemoTypeMemoId:
 				memo = fmt.Sprintf("%d", memoXDR.MustId())
@@ -439,12 +440,12 @@ func decodeBurnTransaction(xdrBase64 string, networkPassphrase string) (account 
 		}
 	}
 
-	return "", "", "", fmt.Errorf("no payment operation found in burnTransaction")
+	return "", "", "", errors.New("no payment operation found in burnTransaction")
 }
 
 // mergeMetadata reads the current transfer metadata and merges new keys into it.
 // This is necessary because store/memory replaces metadata entirely on update.
-func mergeMetadata(ctx context.Context, store stellarconnect.TransferStore, transferID string, newKeys map[string]any) error {
+func mergeMetadata(ctx context.Context, store anchorsdk.TransferStore, transferID string, newKeys map[string]any) error {
 	transfer, err := store.FindByID(ctx, transferID)
 	if err != nil {
 		return err
@@ -456,5 +457,5 @@ func mergeMetadata(ctx context.Context, store stellarconnect.TransferStore, tran
 	for k, v := range newKeys {
 		merged[k] = v
 	}
-	return store.Update(ctx, transferID, &stellarconnect.TransferUpdate{Metadata: merged})
+	return store.Update(ctx, transferID, &anchorsdk.TransferUpdate{Metadata: merged})
 }

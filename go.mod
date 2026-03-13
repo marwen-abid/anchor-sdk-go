@@ -1,11 +1,8 @@
 module github.com/marwen-abid/anchor-sdk-go
 
-go 1.25.4
+go 1.25.8
 
-require (
-	github.com/stellar/go v0.0.0-20251210100531-aab2ea4aca88
-	github.com/stellar/go-stellar-sdk v0.1.0
-)
+require github.com/stellar/go-stellar-sdk v0.2.0
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect

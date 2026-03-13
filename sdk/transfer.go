@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	stellarconnect "github.com/marwen-abid/anchor-sdk-go"
+	anchorsdk "github.com/marwen-abid/anchor-sdk-go"
 	"github.com/marwen-abid/anchor-sdk-go/errors"
 )
 
@@ -16,10 +16,10 @@ import (
 // It manages client-side status polling with adaptive backoff and event emission.
 type TransferProcess struct {
 	ID             string
-	Status         stellarconnect.TransferStatus
+	Status         anchorsdk.TransferStatus
 	InteractiveURL string
 
-	onStatusChange func(stellarconnect.TransferStatus)
+	onStatusChange func(anchorsdk.TransferStatus)
 	onInteractive  func(string)
 
 	session  *Session
@@ -28,7 +28,7 @@ type TransferProcess struct {
 
 // OnStatusChange registers a callback invoked when the transfer status changes.
 // The handler receives the new status value.
-func (t *TransferProcess) OnStatusChange(handler func(stellarconnect.TransferStatus)) {
+func (t *TransferProcess) OnStatusChange(handler func(anchorsdk.TransferStatus)) {
 	t.onStatusChange = handler
 }
 
@@ -47,7 +47,7 @@ func (t *TransferProcess) OnInteractive(handler func(string)) {
 func (t *TransferProcess) Poll(ctx context.Context) error {
 	url := fmt.Sprintf("%s/transaction?id=%s", t.endpoint, t.ID)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return errors.NewClientError(
 			errors.TRANSFER_STATUS_POLL_FAILED,
@@ -56,17 +56,17 @@ func (t *TransferProcess) Poll(ctx context.Context) error {
 		)
 	}
 
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", t.session.JWT))
+	req.Header.Set("Authorization", "Bearer "+t.session.JWT)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return errors.NewClientError(
 			errors.TRANSFER_STATUS_POLL_FAILED,
-			fmt.Sprintf("failed to poll transfer %s", t.ID),
+			"failed to poll transfer "+t.ID,
 			err,
 		)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
@@ -93,7 +93,7 @@ func (t *TransferProcess) Poll(ctx context.Context) error {
 	}
 
 	oldStatus := t.Status
-	newStatus := stellarconnect.TransferStatus(pollResp.Transaction.Status)
+	newStatus := anchorsdk.TransferStatus(pollResp.Transaction.Status)
 
 	if newStatus != oldStatus {
 		t.Status = newStatus
@@ -135,11 +135,11 @@ func (t *TransferProcess) WaitForCompletion(ctx context.Context) error {
 
 func (t *TransferProcess) isTerminal() bool {
 	switch t.Status {
-	case stellarconnect.StatusCompleted,
-		stellarconnect.StatusFailed,
-		stellarconnect.StatusDenied,
-		stellarconnect.StatusCancelled,
-		stellarconnect.StatusExpired:
+	case anchorsdk.StatusCompleted,
+		anchorsdk.StatusFailed,
+		anchorsdk.StatusDenied,
+		anchorsdk.StatusCancelled,
+		anchorsdk.StatusExpired:
 		return true
 	default:
 		return false

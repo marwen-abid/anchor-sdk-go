@@ -26,7 +26,7 @@ func WithHTTPClient(client *net.Client) ClientOption {
 	}
 }
 
-// NewClient creates a new Stellar Connect client.
+// NewClient creates a new Stellar Anchor client.
 // The networkPassphrase identifies the Stellar network (e.g., "Test SDF Network ; September 2015").
 func NewClient(networkPassphrase string, opts ...ClientOption) *Client {
 	httpClient := net.NewClient()

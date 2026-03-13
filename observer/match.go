@@ -2,7 +2,7 @@ package observer
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log"
 
 	"github.com/marwen-abid/anchor-sdk-go/anchor"
@@ -39,13 +39,13 @@ import (
 //	obs.Start(ctx) // blocks until context cancelled
 func AutoMatchPayments(obs Observer, tm *anchor.TransferManager, distributionAccount string) error {
 	if obs == nil {
-		return fmt.Errorf("observer is nil")
+		return errors.New("observer is nil")
 	}
 	if tm == nil {
-		return fmt.Errorf("transfer manager is nil")
+		return errors.New("transfer manager is nil")
 	}
 	if distributionAccount == "" {
-		return fmt.Errorf("distribution account is empty")
+		return errors.New("distribution account is empty")
 	}
 
 	// Register a payment handler that matches payments to the distribution account

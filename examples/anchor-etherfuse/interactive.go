@@ -8,7 +8,7 @@ import (
 	"math/big"
 	"net/http"
 
-	stellarconnect "github.com/marwen-abid/anchor-sdk-go"
+	anchorsdk "github.com/marwen-abid/anchor-sdk-go"
 	"github.com/marwen-abid/anchor-sdk-go/anchor"
 )
 
@@ -49,7 +49,7 @@ type interactivePageData struct {
 func handleGetInteractive(
 	tm *anchor.TransferManager,
 	ef *EtherfuseClient,
-	store stellarconnect.TransferStore,
+	store anchorsdk.TransferStore,
 ) http.HandlerFunc {
 	tmpl := template.Must(template.ParseFS(interactiveTemplate, "templates/interactive.html"))
 
@@ -112,7 +112,7 @@ func handleGetInteractive(
 func handlePostOnboard(
 	tm *anchor.TransferManager,
 	ef *EtherfuseClient,
-	store stellarconnect.TransferStore,
+	store anchorsdk.TransferStore,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := r.URL.Query().Get("token")
@@ -147,7 +147,7 @@ func handlePostOnboard(
 
 		// Return JSON with the onboarding URL (JS will open it)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
+		_ = json.NewEncoder(w).Encode(map[string]string{
 			"onboarding_url": url,
 		})
 	}
@@ -175,12 +175,12 @@ func handleKYCPoll(
 		kycStatus, err := ef.GetKYCStatus(r.Context(), customerID, transfer.Account)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]string{"status": "not_started"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "not_started"})
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": kycStatus.Status})
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": kycStatus.Status})
 	}
 }
 
@@ -188,7 +188,7 @@ func handleKYCPoll(
 func handlePostQuote(
 	tm *anchor.TransferManager,
 	ef *EtherfuseClient,
-	store stellarconnect.TransferStore,
+	store anchorsdk.TransferStore,
 	assetIdentifiers map[string]string, // maps asset code (e.g. "USDC") to Etherfuse identifier
 ) http.HandlerFunc {
 	tmpl := template.Must(template.ParseFS(interactiveTemplate, "templates/interactive.html"))
@@ -206,7 +206,8 @@ func handlePostQuote(
 			return
 		}
 
-		if err := r.ParseForm(); err != nil {
+		err = r.ParseForm()
+		if err != nil {
 			writeJSONError(w, "invalid form data", http.StatusBadRequest)
 			return
 		}
@@ -228,7 +229,7 @@ func handlePostQuote(
 		quoteID := DeterministicQuoteID(transfer.ID)
 
 		var quoteReq QuoteRequest
-		if transfer.Kind == stellarconnect.KindDeposit {
+		if transfer.Kind == anchorsdk.KindDeposit {
 			// Onramp: MXN → crypto
 			quoteReq = QuoteRequest{
 				QuoteID:    quoteID,
@@ -272,7 +273,7 @@ func handlePostQuote(
 		}
 
 		// Update transfer amount
-		if err := store.Update(r.Context(), transfer.ID, &stellarconnect.TransferUpdate{
+		if err := store.Update(r.Context(), transfer.ID, &anchorsdk.TransferUpdate{
 			Amount: &amount,
 		}); err != nil {
 			log.Printf("Failed to update transfer amount: %v", err)
@@ -308,7 +309,7 @@ func handlePostQuote(
 func handlePostOrder(
 	tm *anchor.TransferManager,
 	ef *EtherfuseClient,
-	store stellarconnect.TransferStore,
+	store anchorsdk.TransferStore,
 ) http.HandlerFunc {
 	tmpl := template.Must(template.ParseFS(interactiveTemplate, "templates/interactive.html"))
 
@@ -326,7 +327,7 @@ func handlePostOrder(
 			return
 		}
 
-		if err := r.ParseForm(); err != nil {
+		if err = r.ParseForm(); err != nil {
 			writeJSONError(w, "invalid form data", http.StatusBadRequest)
 			return
 		}
@@ -354,7 +355,7 @@ func handlePostOrder(
 			AssetCode: transfer.AssetCode,
 		}
 
-		if transfer.Kind == stellarconnect.KindDeposit {
+		if transfer.Kind == anchorsdk.KindDeposit {
 			// Create onramp order
 			result, err := ef.CreateOnrampOrder(ctx, orderReq)
 			if err != nil {
@@ -456,7 +457,7 @@ func subtractDecimal(a, b string) string {
 }
 
 // renderError renders the template with an error message.
-func renderError(w http.ResponseWriter, tmpl *template.Template, token string, transfer *stellarconnect.Transfer, msg string) {
+func renderError(w http.ResponseWriter, tmpl *template.Template, token string, transfer *anchorsdk.Transfer, msg string) {
 	data := interactivePageData{
 		Token:        token,
 		Kind:         string(transfer.Kind),

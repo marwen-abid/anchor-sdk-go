@@ -17,45 +17,45 @@ import (
 // Each key is a "from" state, and the value is a set of valid "to" states.
 //
 // Terminal states (completed, failed, denied, cancelled, expired) have no outgoing transitions.
-var legalTransitions = map[stellarconnect.TransferStatus]map[stellarconnect.TransferStatus]bool{
-	stellarconnect.StatusInitiating: {
-		stellarconnect.StatusInteractive:              true,
-		stellarconnect.StatusPendingUserTransferStart: true,
-		stellarconnect.StatusPendingExternal:          true,
-		stellarconnect.StatusFailed:                   true,
-		stellarconnect.StatusDenied:                   true,
+var legalTransitions = map[anchorsdk.TransferStatus]map[anchorsdk.TransferStatus]bool{
+	anchorsdk.StatusInitiating: {
+		anchorsdk.StatusInteractive:              true,
+		anchorsdk.StatusPendingUserTransferStart: true,
+		anchorsdk.StatusPendingExternal:          true,
+		anchorsdk.StatusFailed:                   true,
+		anchorsdk.StatusDenied:                   true,
 	},
-	stellarconnect.StatusInteractive: {
-		stellarconnect.StatusPendingUserTransferStart: true,
-		stellarconnect.StatusPendingExternal:          true,
-		stellarconnect.StatusFailed:                   true,
-		stellarconnect.StatusExpired:                  true,
+	anchorsdk.StatusInteractive: {
+		anchorsdk.StatusPendingUserTransferStart: true,
+		anchorsdk.StatusPendingExternal:          true,
+		anchorsdk.StatusFailed:                   true,
+		anchorsdk.StatusExpired:                  true,
 	},
-	stellarconnect.StatusPendingUserTransferStart: {
-		stellarconnect.StatusPendingExternal: true,
-		stellarconnect.StatusPendingStellar:  true,
-		stellarconnect.StatusFailed:          true,
-		stellarconnect.StatusCancelled:       true,
+	anchorsdk.StatusPendingUserTransferStart: {
+		anchorsdk.StatusPendingExternal: true,
+		anchorsdk.StatusPendingStellar:  true,
+		anchorsdk.StatusFailed:          true,
+		anchorsdk.StatusCancelled:       true,
 	},
-	stellarconnect.StatusPendingExternal: {
-		stellarconnect.StatusPendingStellar: true,
-		stellarconnect.StatusFailed:         true,
-		stellarconnect.StatusCancelled:      true,
+	anchorsdk.StatusPendingExternal: {
+		anchorsdk.StatusPendingStellar: true,
+		anchorsdk.StatusFailed:         true,
+		anchorsdk.StatusCancelled:      true,
 	},
-	stellarconnect.StatusPendingStellar: {
-		stellarconnect.StatusCompleted: true,
-		stellarconnect.StatusFailed:    true,
+	anchorsdk.StatusPendingStellar: {
+		anchorsdk.StatusCompleted: true,
+		anchorsdk.StatusFailed:    true,
 	},
-	stellarconnect.StatusPaymentRequired: {
-		stellarconnect.StatusPendingStellar: true,
-		stellarconnect.StatusFailed:         true,
+	anchorsdk.StatusPaymentRequired: {
+		anchorsdk.StatusPendingStellar: true,
+		anchorsdk.StatusFailed:         true,
 	},
 	// Terminal states have no outgoing transitions
-	stellarconnect.StatusCompleted: {},
-	stellarconnect.StatusFailed:    {},
-	stellarconnect.StatusDenied:    {},
-	stellarconnect.StatusCancelled: {},
-	stellarconnect.StatusExpired:   {},
+	anchorsdk.StatusCompleted: {},
+	anchorsdk.StatusFailed:    {},
+	anchorsdk.StatusDenied:    {},
+	anchorsdk.StatusCancelled: {},
+	anchorsdk.StatusExpired:   {},
 }
 
 // ValidateTransition checks if a state transition from "from" to "to" is legal
@@ -70,7 +70,7 @@ var legalTransitions = map[stellarconnect.TransferStatus]map[stellarconnect.Tran
 //	if err != nil {
 //	    // Handle illegal transition
 //	}
-func ValidateTransition(from, to stellarconnect.TransferStatus) error {
+func ValidateTransition(from, to anchorsdk.TransferStatus) error {
 	// Check if the "from" state exists in the transition map
 	validToStates, exists := legalTransitions[from]
 	if !exists {

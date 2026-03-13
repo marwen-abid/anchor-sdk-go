@@ -1,0 +1,51 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - gocritic
+    - gosec
+    - misspell
+    - unconvert
+    - unparam
+    - errname
+    - predeclared
+    - copyloopvar
+    - intrange
+    - perfsprint
+
+  settings:
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+
+    gosec:
+      excludes:
+        - G101 # hardcoded credentials (dev examples use test keys intentionally)
+        - G107 # url from variable (core HTTP client intentionally accepts caller-supplied URLs)
+
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+
+  exclusions:
+    rules:
+      - path: examples/
+        linters:
+          - gosec
+          - unparam
+      - path: core/net/
+        linters:
+          - gosec
+
+formatters:
+  enable:
+    - gofumpt
+
+  settings:
+    gofumpt:
+      extra-rules: true
+
