@@ -11,8 +11,8 @@ ETHERFUSE_PORT ?= 8001
 ## check: lint + vet + tests (run after every big change)
 check: lint vet test
 
-## ci: everything in check + integration tests (run before push)
-ci: check integration
+## ci: everything in check + module hygiene + integration tests (run before push)
+ci: check tidy integration
 
 # ── Build ─────────────────────────────────────────────────────────────────────
 
@@ -22,7 +22,7 @@ build:
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
 test:
-	go test -race -coverprofile=coverage.out -covermode=atomic ./...
+	go test -race ./...
 
 # ── Linting & formatting ──────────────────────────────────────────────────────
 

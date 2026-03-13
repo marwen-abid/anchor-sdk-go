@@ -12,7 +12,7 @@ import (
 
 	anchorsdk "github.com/marwen-abid/anchor-sdk-go"
 	"github.com/marwen-abid/anchor-sdk-go/anchor"
-	"github.com/stellar/go/keypair"
+	"github.com/stellar/go-stellar-sdk/keypair"
 )
 
 // supportedAssets is the set of asset codes supported by this example anchor.

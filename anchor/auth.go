@@ -10,8 +10,8 @@ import (
 	"github.com/marwen-abid/anchor-sdk-go"
 	corecrypto "github.com/marwen-abid/anchor-sdk-go/core/crypto"
 	"github.com/marwen-abid/anchor-sdk-go/errors"
-	"github.com/stellar/go/keypair"
-	"github.com/stellar/go/txnbuild"
+	"github.com/stellar/go-stellar-sdk/keypair"
+	"github.com/stellar/go-stellar-sdk/txnbuild"
 )
 
 const (

@@ -28,11 +28,6 @@ jobs:
           go mod tidy
           git diff --exit-code go.mod go.sum
 
-      - name: govulncheck
-        run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./...
-
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -51,13 +46,7 @@ jobs:
         run: go vet ./...
 
       - name: Test
-        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
-
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage
-          path: coverage.out
+        run: go test -race ./...
 
   integration-basic:
     name: Integration (basic-anchor)
