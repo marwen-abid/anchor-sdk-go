@@ -1,0 +1,6 @@
+stateDiagram-v2
+    [*] --> initiating: InitiateDeposit()
+    initiating --> interactive: (immediate)
+    interactive --> pending_user_transfer_start: CompleteInteractive()<br/>order created
+    pending_user_transfer_start --> pending_stellar: NotifyFundsReceived()<br/>Etherfuse: funded
+    pending_stellar --> completed: NotifyPaymentSent()<br/>Etherfuse: completed

@@ -1,0 +1,32 @@
+sequenceDiagram
+    participant W as Wallet
+    participant B as Browser
+    participant A as Anchor
+    participant E as Etherfuse
+    participant S as Stellar
+
+    W->>A: POST /sep24/.../deposit/interactive
+    A-->>W: { url, id }
+    W->>B: Open interactive URL
+
+    B->>A: GET /interactive (KYC check)
+    B->>A: POST /interactive/onboard
+    A->>E: POST /ramp/onboarding-url
+    Note over B: User completes KYC
+
+    B->>A: POST /interactive/quote
+    A->>E: POST /ramp/quote
+    B->>A: POST /interactive/order
+    A->>E: POST /ramp/order
+    A-->>B: CLABE + amount (SPEI instructions)
+
+    Note over B: User sends MXN via SPEI
+
+    E-->>A: order status: funded
+    A->>A: NotifyFundsReceived()
+    E->>S: Send crypto to user
+    E-->>A: order status: completed
+    A->>A: NotifyPaymentSent()
+
+    W->>A: GET /sep24/transaction
+    A-->>W: status: completed

@@ -83,38 +83,7 @@ examples/anchor-etherfuse/
 
 ### How It Fits Together
 
-```mermaid
-flowchart TD
-    Wallet["Wallet (SEP Client)"]
-    Browser["Browser (Interactive UI)"]
-
-    subgraph Anchor["Anchor Server :8000"]
-        SEP1["SEP-1<br/>stellar.toml"]
-        SEP10["SEP-10<br/>Auth (JWT)"]
-        SEP24["SEP-24<br/>Deposit / Withdraw"]
-        Interactive["Interactive Flow<br/>KYC → Quote → Order"]
-        Webhooks["Webhooks +<br/>Order Poller"]
-        Observer["Horizon Observer<br/>Payment Auto-Match"]
-    end
-
-    EF["Etherfuse FX Ramp API"]
-    Stellar["Stellar Network"]
-    Store[("Store<br/>(Memory or PostgreSQL)")]
-
-    Wallet -->|"discovery"| SEP1
-    Wallet -->|"challenge/verify"| SEP10
-    Wallet -->|"initiate transfer"| SEP24
-    Wallet -->|"poll status"| SEP24
-    SEP24 -->|"returns interactive URL"| Browser
-    Browser --> Interactive
-    Interactive -->|"KYC, quotes, orders"| EF
-    Webhooks -->|"order status updates"| EF
-    Observer -->|"stream payments"| Stellar
-    SEP24 --- Store
-    Interactive --- Store
-    Webhooks --- Store
-    Observer --- Store
-```
+![Architecture overview showing wallet, anchor server components, Etherfuse API, Stellar network, and storage](docs/diagrams/architecture-overview.png)
 
 The wallet only interacts with standard SEP endpoints. The `/interactive/*` pages are opened in a browser popup by the wallet and driven by the **user** — the wallet never calls those endpoints directly.
 
@@ -122,104 +91,21 @@ The wallet only interacts with standard SEP endpoints. The `/interactive/*` page
 
 A deposit converts fiat (MXN via SPEI bank transfer) into crypto (USDC or CETES) on Stellar.
 
-```mermaid
-sequenceDiagram
-    participant W as Wallet
-    participant B as Browser
-    participant A as Anchor
-    participant E as Etherfuse
-    participant S as Stellar
-
-    W->>A: POST /sep24/.../deposit/interactive
-    A-->>W: { url, id }
-    W->>B: Open interactive URL
-
-    B->>A: GET /interactive (KYC check)
-    B->>A: POST /interactive/onboard
-    A->>E: POST /ramp/onboarding-url
-    Note over B: User completes KYC
-
-    B->>A: POST /interactive/quote
-    A->>E: POST /ramp/quote
-    B->>A: POST /interactive/order
-    A->>E: POST /ramp/order
-    A-->>B: CLABE + amount (SPEI instructions)
-
-    Note over B: User sends MXN via SPEI
-
-    E-->>A: order status: funded
-    A->>A: NotifyFundsReceived()
-    E->>S: Send crypto to user
-    E-->>A: order status: completed
-    A->>A: NotifyPaymentSent()
-
-    W->>A: GET /sep24/transaction
-    A-->>W: status: completed
-```
+![Deposit flow sequence diagram showing wallet, browser, anchor, Etherfuse, and Stellar interactions](docs/diagrams/deposit-flow.png)
 
 ### Deposit State Progression
 
-```mermaid
-stateDiagram-v2
-    [*] --> initiating: InitiateDeposit()
-    initiating --> interactive: (immediate)
-    interactive --> pending_user_transfer_start: CompleteInteractive()<br/>order created
-    pending_user_transfer_start --> pending_stellar: NotifyFundsReceived()<br/>Etherfuse: funded
-    pending_stellar --> completed: NotifyPaymentSent()<br/>Etherfuse: completed
-```
+![Deposit state progression from initiating through interactive, pending, to completed](docs/diagrams/deposit-states.png)
 
 ## Withdrawal Flow (Crypto → MXN)
 
 A withdrawal converts crypto on Stellar into fiat (MXN sent to a bank account via SPEI).
 
-```mermaid
-sequenceDiagram
-    participant W as Wallet
-    participant B as Browser
-    participant A as Anchor
-    participant E as Etherfuse
-    participant S as Stellar
-
-    W->>A: POST /sep24/.../withdraw/interactive
-    A-->>W: { url, id }
-    W->>B: Open interactive URL
-
-    Note over B: Same KYC + quote flow as deposit
-
-    B->>A: POST /interactive/order
-    A->>E: POST /ramp/order (offramp)
-    A-->>B: Waiting for wallet payment
-
-    W->>A: GET /sep24/transaction
-    A-->>W: status: pending_user_transfer_start<br/>withdraw_anchor_account, memo
-
-    W->>S: Send crypto payment (with memo)
-    S-->>A: Observer detects payment
-    A->>A: NotifyPaymentReceived()
-
-    E-->>A: order status: completed
-    A->>A: NotifyDisbursementSent()
-
-    W->>A: GET /sep24/transaction
-    A-->>W: status: completed
-```
+![Withdrawal flow sequence diagram showing wallet, browser, anchor, Etherfuse, and Stellar interactions](docs/diagrams/withdrawal-flow.png)
 
 ### Withdrawal State Progression
 
-```mermaid
-stateDiagram-v2
-    [*] --> initiating: InitiateWithdrawal()
-    initiating --> interactive: (immediate)
-    interactive --> pending_external: CompleteInteractive()<br/>order created
-    pending_external --> pending_stellar: NotifyPaymentReceived()<br/>Observer: Stellar payment
-    pending_stellar --> completed: NotifyDisbursementSent()<br/>Etherfuse: completed
-
-    note right of pending_external
-        SEP-24 maps this to
-        pending_user_transfer_start
-        once withdraw details are set
-    end note
-```
+![Withdrawal state progression from initiating through interactive, pending_external, to completed](docs/diagrams/withdrawal-states.png)
 
 ## HTTP Endpoints
 

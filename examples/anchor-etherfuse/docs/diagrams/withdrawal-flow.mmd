@@ -1,0 +1,29 @@
+sequenceDiagram
+    participant W as Wallet
+    participant B as Browser
+    participant A as Anchor
+    participant E as Etherfuse
+    participant S as Stellar
+
+    W->>A: POST /sep24/.../withdraw/interactive
+    A-->>W: { url, id }
+    W->>B: Open interactive URL
+
+    Note over B: Same KYC + quote flow as deposit
+
+    B->>A: POST /interactive/order
+    A->>E: POST /ramp/order (offramp)
+    A-->>B: Waiting for wallet payment
+
+    W->>A: GET /sep24/transaction
+    A-->>W: status: pending_user_transfer_start<br/>withdraw_anchor_account, memo
+
+    W->>S: Send crypto payment (with memo)
+    S-->>A: Observer detects payment
+    A->>A: NotifyPaymentReceived()
+
+    E-->>A: order status: completed
+    A->>A: NotifyDisbursementSent()
+
+    W->>A: GET /sep24/transaction
+    A-->>W: status: completed

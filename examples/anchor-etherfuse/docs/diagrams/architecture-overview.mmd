@@ -1,0 +1,30 @@
+flowchart TD
+    Wallet["Wallet (SEP Client)"]
+    Browser["Browser (Interactive UI)"]
+
+    subgraph Anchor["Anchor Server :8000"]
+        SEP1["SEP-1<br/>stellar.toml"]
+        SEP10["SEP-10<br/>Auth (JWT)"]
+        SEP24["SEP-24<br/>Deposit / Withdraw"]
+        Interactive["Interactive Flow<br/>KYC → Quote → Order"]
+        Webhooks["Webhooks +<br/>Order Poller"]
+        Observer["Horizon Observer<br/>Payment Auto-Match"]
+    end
+
+    EF["Etherfuse FX Ramp API"]
+    Stellar["Stellar Network"]
+    Store[("Store<br/>(Memory or PostgreSQL)")]
+
+    Wallet -->|"discovery"| SEP1
+    Wallet -->|"challenge/verify"| SEP10
+    Wallet -->|"initiate transfer"| SEP24
+    Wallet -->|"poll status"| SEP24
+    SEP24 -->|"returns interactive URL"| Browser
+    Browser --> Interactive
+    Interactive -->|"KYC, quotes, orders"| EF
+    Webhooks -->|"order status updates"| EF
+    Observer -->|"stream payments"| Stellar
+    SEP24 --- Store
+    Interactive --- Store
+    Webhooks --- Store
+    Observer --- Store
