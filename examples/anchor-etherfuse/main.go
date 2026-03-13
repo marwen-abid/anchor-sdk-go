@@ -21,12 +21,16 @@ import (
 	"strings"
 	"time"
 
+	anchorsdk "github.com/marwen-abid/anchor-sdk-go"
 	"github.com/marwen-abid/anchor-sdk-go/anchor"
 	"github.com/marwen-abid/anchor-sdk-go/core/account"
 	"github.com/marwen-abid/anchor-sdk-go/core/toml"
 	"github.com/marwen-abid/anchor-sdk-go/observer"
 	"github.com/marwen-abid/anchor-sdk-go/signers"
 	"github.com/marwen-abid/anchor-sdk-go/store/memory"
+	pgstore "github.com/marwen-abid/anchor-sdk-go/store/postgres"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const jwtExpiry = 24 * time.Hour
@@ -51,17 +55,41 @@ type authResponse struct {
 }
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
 	cfg, err := LoadConfig()
 	if err != nil {
-		log.Fatalf("Configuration error: %v", err)
+		return fmt.Errorf("configuration error: %w", err)
 	}
 
 	signer, err := signers.FromSecret(cfg.AnchorSecret)
 	if err != nil {
-		log.Fatalf("Failed to create signer: %v", err)
+		return fmt.Errorf("failed to create signer: %w", err)
 	}
 
-	nonceStore := memory.NewNonceStore()
+	var nonceStore anchorsdk.NonceStore
+	var transferStore anchorsdk.TransferStore
+
+	switch cfg.StoreType {
+	case "postgres":
+		var pool *pgxpool.Pool
+		pool, err = pgstore.Connect(context.Background(), cfg.DatabaseURL)
+		if err != nil {
+			return fmt.Errorf("failed to connect to postgres: %w", err)
+		}
+		defer pool.Close()
+		nonceStore = pgstore.NewNonceStore(pool)
+		transferStore = pgstore.NewTransferStore(pool)
+		log.Printf("Using PostgreSQL store")
+	default:
+		nonceStore = memory.NewNonceStore()
+		transferStore = memory.NewTransferStore()
+		log.Printf("Using in-memory store")
+	}
 
 	jwtIssuer, jwtVerifier := anchor.NewHMACJWT(
 		[]byte(cfg.JWTSecret),
@@ -81,10 +109,9 @@ func main() {
 		AccountFetcher:    accountFetcher,
 	})
 	if err != nil {
-		log.Fatalf("Failed to create auth issuer: %v", err)
+		return fmt.Errorf("failed to create auth issuer: %w", err)
 	}
 
-	transferStore := memory.NewTransferStore()
 	baseURL := "http://" + cfg.AnchorDomain
 	transferConfig := anchor.Config{
 		Domain:              cfg.AnchorDomain,
@@ -131,7 +158,7 @@ func main() {
 	)
 
 	if err := observer.AutoMatchPayments(obs, transferManager, distributionAccount); err != nil {
-		log.Fatalf("Failed to setup auto-matching: %v", err)
+		return fmt.Errorf("failed to setup auto-matching: %w", err)
 	}
 
 	// SEP-1: stellar.toml — build currencies from Etherfuse assets
@@ -221,9 +248,7 @@ func main() {
 	log.Printf("Etherfuse API: %s", cfg.EtherfuseAPIURL)
 	log.Printf("Webhook:      http://localhost:%d/webhooks/etherfuse", cfg.AnchorPort)
 
-	if err := http.ListenAndServe(addr, handler); err != nil {
-		log.Fatalf("Server failed: %v", err)
-	}
+	return http.ListenAndServe(addr, handler)
 }
 
 // corsMiddleware adds CORS headers to all responses and handles OPTIONS preflight requests.

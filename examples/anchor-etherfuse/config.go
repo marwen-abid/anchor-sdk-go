@@ -23,6 +23,10 @@ type Config struct {
 	NetworkPassphrase string
 	HorizonURL        string
 
+	// Store
+	StoreType   string
+	DatabaseURL string
+
 	// Asset Issuers
 	USDCIssuer  string
 	CETESIssuer string
@@ -45,6 +49,8 @@ func LoadConfig() (*Config, error) {
 		JWTSecret:              getEnv("JWT_SECRET", "test-jwt-secret-key-for-development"),
 		NetworkPassphrase:      getEnv("NETWORK_PASSPHRASE", "Test SDF Network ; September 2015"),
 		HorizonURL:             getEnv("HORIZON_URL", "https://horizon-testnet.stellar.org"),
+		StoreType:              getEnv("STORE_TYPE", "memory"),
+		DatabaseURL:            getEnv("DATABASE_URL", "postgres://anchor:anchor@localhost:5432/anchor?sslmode=disable"),
 		USDCIssuer:             getEnv("USDC_ISSUER", "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"),
 		CETESIssuer:            getEnv("CETES_ISSUER", "GC3CW7EDYRTWQ635VDIGY6S4ZUF5L6TQ7AA4MWS7LEQDBLUSZXV7UPS4"),
 	}
