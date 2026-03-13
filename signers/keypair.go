@@ -34,7 +34,7 @@ func (s *keypairSigner) PublicKey() string {
 // SignTransaction signs a Stellar transaction envelope (base64 XDR).
 // It parses the XDR, signs the transaction hash with the keypair, and returns
 // the signed envelope as base64 XDR.
-func (s *keypairSigner) SignTransaction(ctx context.Context, xdr, networkPassphrase string) (string, error) {
+func (s *keypairSigner) SignTransaction(_ context.Context, xdr, networkPassphrase string) (string, error) {
 	parsed, err := txnbuild.TransactionFromXDR(xdr)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse transaction XDR: %w", err)

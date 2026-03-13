@@ -331,7 +331,7 @@ func pollOrders(ctx context.Context, ef *EtherfuseClient, tm *anchor.TransferMan
 	}
 }
 
-func handleKYCUpdated(ctx context.Context, data json.RawMessage) {
+func handleKYCUpdated(_ context.Context, data json.RawMessage) {
 	var payload KYCUpdatedPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
 		log.Printf("Webhook: failed to parse kyc_updated: %v", err)
@@ -401,7 +401,7 @@ func findTransferByOrderID(ctx context.Context, store anchorsdk.TransferStore, o
 // and extracts the destination account, memo, and memo type from the payment operation.
 // This is used to populate withdraw_anchor_account, withdraw_memo, and withdraw_memo_type
 // for SEP-24 withdrawal compliance (design doc section 6.6, Option A).
-func decodeBurnTransaction(xdrBase64, networkPassphrase string) (account, memo, memoType string, err error) {
+func decodeBurnTransaction(xdrBase64, _ string) (account, memo, memoType string, err error) {
 	parsed, err := txnbuild.TransactionFromXDR(xdrBase64)
 	if err != nil {
 		return "", "", "", fmt.Errorf("parse XDR: %w", err)

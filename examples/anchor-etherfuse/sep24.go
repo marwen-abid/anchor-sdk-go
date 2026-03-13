@@ -292,7 +292,7 @@ func handleWithdrawInteractive(tm *anchor.TransferManager) http.HandlerFunc {
 }
 
 // handleGetTransaction returns the status of a single transfer.
-func handleGetTransaction(tm *anchor.TransferManager, store anchorsdk.TransferStore, baseURL string) http.HandlerFunc {
+func handleGetTransaction(_ *anchor.TransferManager, store anchorsdk.TransferStore, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, ok := anchor.ClaimsFromContext(r.Context())
 		if !ok {
